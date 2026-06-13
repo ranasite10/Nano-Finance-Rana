@@ -168,21 +168,46 @@ class WebAudioAlertManager {
 }
 
 export default function AndroidSimulator() {
+  // Track browser audio autoplay permission status
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+
   // SharedPreferences states saved locally under state
-  const [baseUrl, setBaseUrl] = useState(window.location.origin);
-  const [pollInterval, setPollInterval] = useState(5);
-  const [alarmDuration, setAlarmDuration] = useState(10);
-  const [isServiceRunning, setIsServiceRunning] = useState(true);
-  const [ignoreBatteryOptimizations, setIgnoreBatteryOptimizations] = useState(false);
+  const [baseUrl, setBaseUrl] = useState(() => {
+    return localStorage.getItem('android_base_url') || window.location.origin;
+  });
+  const [pollInterval, setPollInterval] = useState(() => {
+    const saved = localStorage.getItem('android_poll_interval');
+    return saved ? Number(saved) : 5;
+  });
+  const [alarmDuration, setAlarmDuration] = useState(() => {
+    const saved = localStorage.getItem('android_alarm_duration');
+    return saved ? Number(saved) : 10;
+  });
+  const [isServiceRunning, setIsServiceRunning] = useState(() => {
+    const saved = localStorage.getItem('android_is_service_running');
+    return saved !== 'false';
+  });
+  const [ignoreBatteryOptimizations, setIgnoreBatteryOptimizations] = useState(() => {
+    const saved = localStorage.getItem('android_ignore_battery_opts');
+    return saved === 'true';
+  });
 
   // Alarms per Step Configuration (Tongs)
-  const [tongs, setTongs] = useState([
-    { step: 0, isActive: true, type: 'SOFT_CHIME' as const },
-    { step: 1, isActive: true, type: 'DIGITAL_BEEP' as const },
-    { step: 2, isActive: true, type: 'PHONE_RINGTONE' as const },
-    { step: 3, isActive: true, type: 'DIGITAL_BEEP' as const },
-    { step: 4, isActive: true, type: 'SOFT_CHIME' as const },
-  ]);
+  const [tongs, setTongs] = useState<Array<{ step: number; isActive: boolean; type: 'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP' }>>(() => {
+    const saved = localStorage.getItem('android_tongs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { step: 0, isActive: true, type: 'SOFT_CHIME' },
+      { step: 1, isActive: true, type: 'DIGITAL_BEEP' },
+      { step: 2, isActive: true, type: 'PHONE_RINGTONE' },
+      { step: 3, isActive: true, type: 'DIGITAL_BEEP' },
+      { step: 4, isActive: true, type: 'SOFT_CHIME' },
+    ];
+  });
 
   // Polling tracker states
   const [isPolling, setIsPolling] = useState(false);
@@ -192,6 +217,76 @@ export default function AndroidSimulator() {
   // Audio Player instance on browser
   const audioManager = useRef(new WebAudioAlertManager());
   const checkedKeys = useRef<Set<string>>(new Set());
+
+  // Check audio context lock state on load and set up auto-unlock click/touch listeners
+  useEffect(() => {
+    const checkState = () => {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const dummyCtx = new AudioContextClass();
+        if (dummyCtx.state === 'running') {
+          setIsAudioUnlocked(true);
+        }
+        dummyCtx.close();
+      }
+    };
+    checkState();
+
+    const doUnlock = () => {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            setIsAudioUnlocked(true);
+            ctx.close();
+          }).catch(() => {});
+        } else {
+          setIsAudioUnlocked(true);
+          ctx.close();
+        }
+      }
+    };
+
+    const handleInteraction = () => {
+      doUnlock();
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, []);
+
+  // Persist SharedPreferences to localStorage
+  useEffect(() => {
+    localStorage.setItem('android_base_url', baseUrl);
+  }, [baseUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('android_poll_interval', String(pollInterval));
+  }, [pollInterval]);
+
+  useEffect(() => {
+    localStorage.setItem('android_alarm_duration', String(alarmDuration));
+  }, [alarmDuration]);
+
+  useEffect(() => {
+    localStorage.setItem('android_is_service_running', String(isServiceRunning));
+  }, [isServiceRunning]);
+
+  useEffect(() => {
+    localStorage.setItem('android_ignore_battery_opts', String(ignoreBatteryOptimizations));
+  }, [ignoreBatteryOptimizations]);
+
+  useEffect(() => {
+    localStorage.setItem('android_tongs', JSON.stringify(tongs));
+  }, [tongs]);
 
   // Stop sound on unmount
   useEffect(() => {
@@ -306,6 +401,42 @@ export default function AndroidSimulator() {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 p-4 bg-[#09090b] min-h-screen">
+      {!isAudioUnlocked && (
+        <div className="col-span-12 bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 text-amber-200">
+          <div className="flex items-center gap-3">
+            <Volume2 className="w-5 h-5 text-amber-400 animate-pulse shrink-0" />
+            <div className="text-left">
+              <h4 className="text-xs font-bold font-sans">ব্রাউজার অডিও লকড! (Browser Audio Blocked)</h4>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-normal">
+                সাধারণত ব্রাউজারের অটো-প্লে ফিচারের কারণে প্রথমবার কোনো ইউজারের ক্লিক ছাড়া সাউন্ড বাজে না। লাইভ ব্যাকগ্রাউন্ডে কাস্টমার ট্র্যাকিং সুর বাজানোর জন্য ডানদিকের বাটনে ক্লিক করে আনমিউট বা সচল করুন।
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioContextClass) {
+                const ctx = new AudioContextClass();
+                ctx.resume().then(() => {
+                  setIsAudioUnlocked(true);
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.start();
+                  osc.stop(ctx.currentTime + 0.1);
+                  ctx.close();
+                }).catch((e) => console.log(e));
+              }
+            }}
+            className="text-[12px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-black px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer shrink-0"
+          >
+            🔊 অডিও সচল করুন (Unmute Alarm)
+          </button>
+        </div>
+      )}
+
       {/* Simulation Info Column */}
       <div className="xl:col-span-4 flex flex-col gap-5 sm:p-2">
         <div className="bg-[#121215] border border-zinc-850 p-6 rounded-2xl shadow-xl">
