@@ -622,8 +622,7 @@ app.post("/api/user/login", (req, res) => {
   const db = readDB();
   let user = db.users.find((u: any) => u.phone === phone);
   if (!user) {
-    // If not exists, dynamically seed and check pin
-    user = getOrCreateUserProfile(phone);
+    return res.status(401).json({ error: "মোবাইল নম্বরটি নিবন্ধিত নয়। অনুগ্রহ করে রেজিস্ট্রেশন করুন।" });
   }
 
   // 2. Perform PIN verification

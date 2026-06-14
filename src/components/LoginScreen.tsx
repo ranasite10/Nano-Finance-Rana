@@ -38,8 +38,8 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
   const [regBkash, setRegBkash] = useState('');
   const [regNagad, setRegNagad] = useState('');
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (phone.length < 11 || !phone.startsWith('01')) {
       setErrorMsg('সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন (যেমন: 017xxxxxxxx)');
       return;
@@ -205,11 +205,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
       {/* Dynamic Forms */}
       {!isRegisterMode ? (
         /* ==================== LOGIN VIEW ==================== */
-        <form onSubmit={handleLoginSubmit} autoComplete="off" className="flex flex-col gap-4 my-auto pt-6 shrink-0">
-          {/* Decoy inputs to trap and suppress modern browser / mobile keyboard autocomplete suggestions */}
-          <input type="text" name="dummy_phone_trap" className="absolute opacity-0 pointer-events-none -z-50" style={{ position: 'absolute', top: '-1000px', left: '-1000px' }} tabIndex={-1} autoComplete="off" />
-          <input type="password" name="dummy_pin_trap" className="absolute opacity-0 pointer-events-none -z-50" style={{ position: 'absolute', top: '-1000px', left: '-1000px' }} tabIndex={-1} autoComplete="new-password" />
-
+        <div className="flex flex-col gap-4 my-auto pt-6 shrink-0">
           <div className="text-center -mt-2 mb-2">
             <span className="text-[#c5a059] text-xs font-semibold uppercase tracking-wider block">
               পিন (PIN) দিয়ে প্রবেশ করুন
@@ -250,6 +246,11 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                   if (errorMsg) setErrorMsg('');
                   if (successMsg) setSuccessMsg('');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleLoginSubmit();
+                  }
+                }}
                 placeholder="01XXXXXXXXX"
                 className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-mono text-zinc-200 focus:outline-none transition-all font-normal"
                 required
@@ -265,17 +266,25 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
             <div className="relative flex items-center">
               <KeyRound className="absolute left-4 w-4 h-4 text-zinc-650" />
               <input
-                type="password"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 id="input-login-pin-no-autofill"
                 name="x_nano_f_sec_pn"
-                autoComplete="new-password"
+                autoComplete="off"
                 maxLength={6}
                 value={pin}
                 onChange={(e) => {
                   setPin(e.target.value.replace(/[^0-9]/g, ''));
                   if (errorMsg) setErrorMsg('');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleLoginSubmit();
+                  }
+                }}
                 placeholder="••••••"
+                style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
                 className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-mono tracking-[0.25em] text-zinc-200 focus:outline-none transition-all font-normal"
                 required
               />
@@ -286,9 +295,10 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
 
           {/* Submit Button */}
           <button
-            type="submit"
+            type="button"
             id="btn-login-submit"
             disabled={isLoading}
+            onClick={() => handleLoginSubmit()}
             className="w-full bg-[#c5a059] hover:bg-[#dfc187] active:scale-[0.98] text-zinc-950 py-3.5 px-4 rounded-xl font-bold transition-all font-sans text-xs uppercase tracking-wider flex justify-center items-center gap-2 cursor-pointer"
           >
             {isLoading ? (
@@ -307,11 +317,11 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
               setSuccessMsg('');
               setIsRegisterMode(true);
             }}
-            className="w-full mt-1 bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 text-[#c5a059] py-3 rounded-xl font-bold transition-all text-xs font-sans tracking-wide cursor-pointer flex justify-center items-center gap-1.5 focus:outline-none"
+            className="w-full mt-1 bg-zinc-900/60 hover:bg-zinc-900 border border-[#1d1d22]/80 hover:border-zinc-700/80 text-[#c5a059] py-3 rounded-xl font-bold transition-all text-xs font-sans tracking-wide cursor-pointer flex justify-center items-center gap-1.5 focus:outline-none"
           >
             নতুন অ্যাকাউন্ট খুলুন (Open New Account)
           </button>
-        </form>
+        </div>
       ) : (
         /* ==================== REGISTER VIEW ==================== */
         <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-4 my-auto pt-6 shrink-0">
@@ -552,7 +562,10 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
             <div className="relative flex items-center">
               <KeyRound className="absolute left-4 w-4 h-4 text-zinc-600" />
               <input
-                type="password"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
                 maxLength={6}
                 value={regPin}
                 onChange={(e) => {
@@ -560,6 +573,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                   if (errorMsg) setErrorMsg('');
                 }}
                 placeholder="কমপক্ষে ৪ ডিজিট পিন"
+                style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
                 className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-mono tracking-[0.25em] text-zinc-200 focus:outline-none transition-all font-normal"
                 required
               />
