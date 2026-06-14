@@ -585,6 +585,18 @@ export default function App() {
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
   };
 
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Render correct simulated section inside phone mockup
   const renderMockupScreen = () => {
     switch (activeScreen) {
@@ -694,10 +706,8 @@ export default function App() {
         return (
           <NotificationSection
             notifications={notifications}
-            onMarkAllRead={() => {
-              setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
-            }}
-            onClearAll={() => setNotifications([])}
+            onMarkAllRead={handleMarkAllNotificationsRead}
+            onClearAll={handleClearAllNotifications}
           />
         );
       case 'profile':
@@ -706,48 +716,32 @@ export default function App() {
             user={user}
             onLogout={handleLogout}
             onNavigate={(s) => navigateTo(s)}
+            onUpdateUser={(updated) => setUser(updated)}
             theme={theme}
-            onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-            onUpdateUser={(updatedUser) => {
-              setUser({
-                ...updatedUser,
-                isLoggedIn: true
-              });
-              if (updatedUser.notifications) {
-                setNotifications(updatedUser.notifications);
-              }
-            }}
+            onToggleTheme={handleToggleTheme}
           />
         );
       case 'admin_dashboard':
         return (
           <AdminDashboard
             operator={user}
-            onNavigateHome={() => navigateTo('home')}
+            onNavigateHome={() => handleLogout()}
             onStateUpdated={() => {
               if (user.phone) {
                 syncStateFromBackend(user.phone);
               }
-              loadSettingsFromBackend();
             }}
           />
         );
       default:
-        return (
-          <HomeSection
-            user={user}
-            onNavigate={(s) => navigateTo(s)}
-            savingsBalance={savingsBalance}
-            unreadCount={unreadCount}
-          />
-        );
+        return <SplashScreen onStart={() => navigateTo('login')} settings={settings} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-200 font-sans flex flex-col md:flex-row antialiased overflow-x-hidden selection:bg-[#c5a059] selection:text-black leading-relaxed">
-      {/* LEFT PANE BOARD: Desktop Controller, Workspace Tools & Style Guidelines - Hidden as per user request */}
-      <div className="hidden">
+      {/* LEFT PANE BOARD: Desktop Controller, Workspace Tools & Style Guidelines */}
+      <div className="hidden md:flex md:w-[360px] md:flex-col gap-5 p-6 bg-[#09090b] border-r border-zinc-900 shrink-0 select-none overflow-y-auto no-scrollbar justify-start">
         <div>
           <div className="flex items-center gap-2.5 mb-2">
             <div className="p-1 px-1.5 text-[10px] bg-[#c5a059] rounded text-black font-black uppercase tracking-wider">
@@ -770,7 +764,7 @@ export default function App() {
           </h3>
 
           {user.isLoggedIn && (user.role === 'main_admin' || user.role === 'sub_admin') ? (
-            <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-900 text-[10.5px] text-zinc-400 font-sans leading-relaxed">
+            <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-900 text-[11px] text-zinc-400 font-sans leading-relaxed">
               <span className="text-[#dfc187] font-bold block mb-1">সুরক্ষিত: মেইন অ্যাডমিন সেশন 🛡️</span>
               অ্যাডমিনদের নিজস্ব কোনো সাধারণ ঋণ ও সঞ্চয় হিসাব থাকে না। গ্রাহক পেমেন্ট ও তথ্য নিরীক্ষণ করতে সরাসরি ডানদিকের প্যানেলটি ব্যবহার করুন।
             </div>
@@ -795,22 +789,22 @@ export default function App() {
           )}
 
           {(!user.isLoggedIn || user.role === 'main_admin' || user.role === 'sub_admin') && (
-            <div className="flex flex-col gap-1.5 mt-1 pt-2 border-t border-zinc-900">
+            <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-zinc-900">
               <span className="text-[10px] text-zinc-500 font-sans font-bold">অ্যাডমিন কন্ট্রোল সিমুলেশন:</span>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleAdminFastLogin('main_admin')}
-                  className="flex items-center justify-center gap-1 py-1 px-1 bg-gradient-to-r from-amber-600 to-[#c5a059] text-zinc-950 rounded-lg text-[10px] font-black font-sans transition-all active:scale-95 cursor-pointer"
+                  className="flex items-center justify-center gap-1 py-1.5 px-2 bg-[#c5a059]/10 hover:bg-[#c5a059]/20 text-[#dfc187] border border-[#c5a059]/20 rounded-xl text-xs font-semibold font-sans transition-all active:scale-95 cursor-pointer text-center"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5px] shrink-0" />
+                  <ShieldCheck className="w-4.5 h-4.5 text-[#c5a059] shrink-0" />
                   <span>মেইন অ্যাডমিন</span>
                 </button>
                 <button
                   onClick={() => handleAdminFastLogin('sub_admin')}
-                  className="flex items-center justify-center gap-1 py-1 px-1 bg-zinc-900 border border-zinc-800 text-[#dfc187] rounded-lg text-[10px] font-bold font-sans hover:bg-zinc-850 transition-all active:scale-95 cursor-pointer"
+                  className="flex items-center justify-center gap-1 py-1.5 px-2 bg-zinc-900 border border-zinc-850 text-[#dfc187] rounded-lg text-[10px] font-bold font-sans hover:bg-zinc-850 transition-all active:scale-95 cursor-pointer text-center"
                 >
-                  <Users className="w-3.5 h-3.5 shrink-0" />
-                  <span>অ্যাডমিন</span>
+                  <Users className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
+                  <span>উপ-অ্যাডমিন</span>
                 </button>
               </div>
             </div>
@@ -861,8 +855,7 @@ export default function App() {
               }
               return ['splash', 'login'].includes(sc.id);
             }).map((sc) => {
-              const checked = activeScreen === sc.id ||
-                (sc.id === 'installment_pay' && activeScreen === 'emi_schedule');
+              const checked = activeScreen === sc.id || (sc.id === 'installment_pay' && activeScreen === 'emi_schedule');
 
               return (
                 <button
@@ -905,7 +898,7 @@ export default function App() {
         </div>
 
         {/* Style Guidelines metadata visualization as specified in screenshot header */}
-        <div className="bg-[#121212] rounded-2xl p-4 border border-zinc-800/70 flex flex-col gap-3 font-sans mt-autoHidden">
+        <div className="bg-[#121212] rounded-2xl p-4 border border-zinc-800/70 flex flex-col gap-3 font-sans mt-auto">
           <h3 className="text-xs font-bold text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
             <Layout className="w-4 h-4 text-[#c5a059]" />
             ডিজাইন সিস্টেম (Style Guide)
@@ -914,8 +907,8 @@ export default function App() {
           <div className="flex flex-col gap-2">
             <div className="grid grid-cols-5 gap-1 text-[8px] font-mono text-center text-white font-medium">
               <div className="p-0.5 rounded bg-[#c5a059] text-black">#c5a</div>
-              <div className="p-0.5 rounded bg-zinc-950 border border-zinc-800">#0909</div>
-              <div className="p-0.5 rounded bg-zinc-900 border border-zinc-800">#1818</div>
+              <div className="p-0.5 rounded bg-zinc-950 border border-zinc-850">#0909</div>
+              <div className="p-0.5 rounded bg-zinc-900 border border-zinc-850">#1818</div>
               <div className="p-0.5 rounded bg-zinc-800">#272</div>
               <div className="p-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">#10b</div>
             </div>
@@ -979,27 +972,27 @@ export default function App() {
                   <button
                     onClick={() => navigateTo('loan_status')}
                     id="tab-loan"
-                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all ${activeScreen === 'loan_status' || activeScreen === 'loan_apply' || activeScreen === 'loan_calc' || activeScreen === 'documents_upload' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
+                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all cursor-pointer ${activeScreen === 'loan_status' || activeScreen === 'loan_apply' || activeScreen === 'loan_calc' || activeScreen === 'documents_upload' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
                   >
-                    <Landmark className="w-5 h-5 cursor-pointer" />
+                    <Landmark className="w-5 h-5" />
                     <span className="text-[10px] font-bold font-sans">ঋণ</span>
                   </button>
 
                   <button
                     onClick={() => navigateTo('emi_schedule')}
                     id="tab-payment"
-                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all ${activeScreen === 'emi_schedule' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
+                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all cursor-pointer ${activeScreen === 'emi_schedule' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
                   >
-                    <CreditCard className="w-5 h-5 cursor-pointer" />
+                    <CreditCard className="w-5 h-5" />
                     <span className="text-[10px] font-bold font-sans">পেমেন্ট</span>
                   </button>
 
                   <button
                     onClick={() => navigateTo('profile')}
                     id="tab-profile"
-                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all ${activeScreen === 'profile' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
+                    className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all cursor-pointer ${activeScreen === 'profile' ? 'text-[#c5a059]' : 'text-zinc-500 hover:text-zinc-350'}`}
                   >
-                    <UserIcon className="w-5 h-5 cursor-pointer" />
+                    <UserIcon className="w-5 h-5" />
                     <span className="text-[10px] font-bold font-sans">প্রোফাইল</span>
                   </button>
                 </>
@@ -1009,6 +1002,7 @@ export default function App() {
         )}
       </div>
 
+      {/* ALERT MESSAGE MODAL PORTAL */}
       {alertMessage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs select-none">
           <div className="bg-[#111113] border border-zinc-850/80 rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center">
