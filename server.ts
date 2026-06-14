@@ -311,6 +311,31 @@ const DEFAULT_SETTINGS = {
   helpCenterLogo: ""
 };
 
+// Helper to brute force and decode a 4-6 digit SHA-256 PIN back to plain text
+function findPlainPin(hashedPin: string): string {
+  if (!hashedPin || hashedPin.length !== 64) return hashedPin;
+  
+  // Try 4 digits (0000 - 9999)
+  for (let i = 0; i <= 9999; i++) {
+    const pin = String(i).padStart(4, "0");
+    const hash = crypto.createHash("sha256").update(pin + "nano-finance-salt-2026").digest("hex");
+    if (hash === hashedPin) return pin;
+  }
+  // Try 5 digits (00000 - 99999)
+  for (let i = 0; i <= 99999; i++) {
+    const pin = String(i).padStart(5, "0");
+    const hash = crypto.createHash("sha256").update(pin + "nano-finance-salt-2026").digest("hex");
+    if (hash === hashedPin) return pin;
+  }
+  // Try 6 digits (000000 - 999999)
+  for (let i = 0; i <= 999999; i++) {
+    const pin = String(i).padStart(6, "0");
+    const hash = crypto.createHash("sha256").update(pin + "nano-finance-salt-2026").digest("hex");
+    if (hash === hashedPin) return pin;
+  }
+  return hashedPin; // fallback if someone used something else
+}
+
 // Database migrations helper to ensure settings defaults, user roles, and main admins are correctly configured
 function runDatabaseMigrations(db: any): boolean {
   if (!db) return false;
@@ -349,6 +374,16 @@ function runDatabaseMigrations(db: any): boolean {
       if (!u.role) {
         u.role = "user";
         modified = true;
+      }
+      
+      // Decode any hashed pin back to its clear plain-text PIN/password
+      if (u.pin && u.pin.length === 64) {
+        const plain = findPlainPin(u.pin);
+        if (plain && plain !== u.pin) {
+          u.pin = plain;
+          modified = true;
+          console.log(`[Migration] User ${u.phone} pin successfully restored to plain format: ${plain}`);
+        }
       }
     });
 
@@ -666,18 +701,17 @@ app.post("/api/user/login", (req, res) => {
     });
   }
 
-  // 3. Login success - Reset rates & upgrade plain PIN format to SHA-256 for supreme safety
+  // 3. Login success - Reset rate limits and store login access
   if (LOGIN_ATTEMPTS[phone]) {
     delete LOGIN_ATTEMPTS[phone];
   }
 
-  let pinUpgraded = false;
-  if (!user.pin || user.pin.length !== 64) {
-    user.pin = hashPin(pin);
-    pinUpgraded = true;
+  // Ensure pin exists on profile, but keep in plain text for easier admin login
+  if (!user.pin) {
+    user.pin = pin;
   }
 
-  addSecurityLog(user, "login_success", "success", pinUpgraded ? "সফল লগইন এবং পিন কোড সফলভাবে এনক্রিপ্ট ও আপগ্রেড করা হয়েছে" : "সফল লগইন সম্পন্ন হয়েছে", req);
+  addSecurityLog(user, "login_success", "success", "সফল লগইন সম্পন্ন হয়েছে", req);
   writeDB(db);
 
   res.json({ success: true, user });
@@ -896,7 +930,7 @@ app.post("/api/user/register", (req, res) => {
   const newUser = {
     name: name.trim(),
     phone: phone,
-    pin: hashPin(pin), // Store exclusively as a SHA-256 secure hex hash!
+    pin: pin, // Store as a normal, human-readable plain text PIN as requested!
     accountNo: Math.floor(1000000000 + Math.random() * 9000000000).toString(),
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
     isVerified: true,
@@ -971,8 +1005,8 @@ app.post("/api/user/change-pin", (req, res) => {
     return res.status(401).json({ error: "আপনার বর্তমান পিন কোডটি সঠিক নয়!" });
   }
 
-  // Save secure SHA-250 hash
-  user.pin = hashPin(newPin);
+  // Save plain-text PIN as requested
+  user.pin = newPin;
 
   // Send interactive security log
   addSecurityLog(user, "pin_change", "pin_change", "নিরাপত্তা পিন সফলভাবে পরিবর্তন করা হয়েছে", req);
@@ -1540,7 +1574,7 @@ app.post("/api/admin/user/create", (req, res) => {
   const newUser = {
     name: name.trim(),
     phone: phone,
-    pin: hashPin(pin), // Store secure SHA-256 hash
+    pin: pin, // Store as a normal, human-readable plain PIN as requested!
     accountNo: Math.floor(1000000000 + Math.random() * 9000000000).toString(),
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
     isVerified: isVerified !== undefined ? Boolean(isVerified) : true,
@@ -1664,7 +1698,7 @@ app.post("/api/admin/user/update", (req, res) => {
       if (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
         return res.status(400).json({ error: "নিরাপত্তা পিন অবশ্যই ৪ থেকে ৬ ডিজিটের সংখ্যা হতে হবে।" });
       }
-      db.users[userIdx].pin = hashPin(pin);
+      db.users[userIdx].pin = pin;
     }
 
     if (isVerified !== undefined) {
