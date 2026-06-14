@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Download, ShieldCheck, CheckCircle2, Ticket } from 'lucide-react';
 import { EmiInstallment, PaymentMethod, LoanItem } from '../types';
 import OnlineCheckoutGateway from './OnlineCheckoutGateway';
+import { cleanNumericInput } from '../utils/digitConverter';
 
 interface PaymentSectionProps {
   savingsBalance: number;
@@ -341,7 +342,7 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
                       type="text"
                       id="input-[#payment-deposit-amount]"
                       value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                      onChange={(e) => setDepositAmount(cleanNumericInput(e.target.value))}
                       placeholder="পরিমাণ লিখুন"
                       className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-3 pl-8 pr-4 font-bold text-white text-md focus:outline-none transition-all font-sans"
                     />
@@ -540,7 +541,7 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
                 maxLength={5}
                 required
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={(e) => setPin(cleanNumericInput(e.target.value))}
                 placeholder="•••••"
                 className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-2.5 text-center font-bold tracking-widest text-md text-white focus:outline-none transition-all"
               />
@@ -642,7 +643,7 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
                 maxLength={5}
                 required
                 value={depositPin}
-                onChange={(e) => setDepositPin(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={(e) => setDepositPin(cleanNumericInput(e.target.value))}
                 placeholder="•••••"
                 className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-2.5 text-center font-bold tracking-widest text-md text-white focus:outline-none transition-all"
               />

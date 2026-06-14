@@ -222,23 +222,36 @@ export default function App() {
   // Sync with real Express Backend Database APIs
   const syncStateFromBackend = async (phone: string) => {
     try {
-      const data = await safeFetchJson<any>('/api/user/get-state', {
+      const response = await fetch('/api/user/get-state', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone }),
       });
-      if (data && data.success && data.user) {
-        setUser({
-          ...data.user,
-          isLoggedIn: true
-        });
-        setSavingsBalance(Number(data.user.savingsBalance));
-        setTransactions(data.user.transactions);
-        setActiveLoans(data.user.activeLoans);
-        setEmiInstallments(data.user.emiInstallments);
-        setNotifications(data.user.notifications);
+      
+      if (response.status === 404 || response.status === 401) {
+        console.warn("User session is inactive or deleted on backend. Logging out.");
+        handleLogout();
+        return;
+      }
+
+      if (response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await response.json();
+          if (data && data.success && data.user) {
+            setUser({
+              ...data.user,
+              isLoggedIn: true
+            });
+            setSavingsBalance(Number(data.user.savingsBalance));
+            setTransactions(data.user.transactions);
+            setActiveLoans(data.user.activeLoans);
+            setEmiInstallments(data.user.emiInstallments);
+            setNotifications(data.user.notifications);
+          }
+        }
       }
     } catch (e) {
       console.warn("Backend sync offline, using local storage cache:", e);

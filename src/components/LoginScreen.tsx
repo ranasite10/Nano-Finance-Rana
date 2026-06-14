@@ -8,6 +8,7 @@ import { Landmark, Phone, KeyRound, CheckCircle2, User as UserIcon, ArrowLeft, M
 
 import { User } from '../types';
 import { safeFetchJson } from '../utils/safeFetch';
+import { cleanNumericInput } from '../utils/digitConverter';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
@@ -240,7 +241,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                 maxLength={11}
                 value={phone}
                 onChange={(e) => {
-                  setPhone(e.target.value.replace(/[^0-9]/g, ''));
+                  setPhone(cleanNumericInput(e.target.value));
                   if (errorMsg) setErrorMsg('');
                   if (successMsg) setSuccessMsg('');
                 }}
@@ -266,7 +267,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                 maxLength={6}
                 value={pin}
                 onChange={(e) => {
-                  setPin(e.target.value.replace(/[^0-9]/g, ''));
+                  setPin(cleanNumericInput(e.target.value));
                   if (errorMsg) setErrorMsg('');
                 }}
                 placeholder="••••••"
@@ -330,6 +331,8 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
               <UserIcon className="absolute left-4 w-4 h-4 text-zinc-600" />
               <input
                 type="text"
+                name="name"
+                autoComplete="name"
                 value={regName}
                 onChange={(e) => {
                   setRegName(e.target.value);
@@ -357,7 +360,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                 maxLength={11}
                 value={regPhone}
                 onChange={(e) => {
-                  setRegPhone(e.target.value.replace(/[^0-9]/g, ''));
+                  setRegPhone(cleanNumericInput(e.target.value));
                   if (errorMsg) setErrorMsg('');
                 }}
                 placeholder="01XXXXXXXXX"
@@ -507,7 +510,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                     maxLength={11}
                     value={regBkash}
                     onChange={(e) => {
-                      setRegBkash(e.target.value.replace(/[^0-9]/g, ''));
+                      setRegBkash(cleanNumericInput(e.target.value));
                       if (errorMsg) setErrorMsg('');
                     }}
                     placeholder="01XXXXXXXXX"
@@ -529,7 +532,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                     maxLength={11}
                     value={regNagad}
                     onChange={(e) => {
-                      setRegNagad(e.target.value.replace(/[^0-9]/g, ''));
+                      setRegNagad(cleanNumericInput(e.target.value));
                       if (errorMsg) setErrorMsg('');
                     }}
                     placeholder="01XXXXXXXXX"
@@ -556,7 +559,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                 maxLength={6}
                 value={regPin}
                 onChange={(e) => {
-                  setRegPin(e.target.value.replace(/[^0-9]/g, ''));
+                  setRegPin(cleanNumericInput(e.target.value));
                   if (errorMsg) setErrorMsg('');
                 }}
                 placeholder="কমপক্ষে ৪ ডিজিট পিন"

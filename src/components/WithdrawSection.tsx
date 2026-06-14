@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Landmark, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { PaymentMethod } from '../types';
+import { cleanNumericInput } from '../utils/digitConverter';
 
 interface WithdrawSectionProps {
   savingsBalance: number;
@@ -134,7 +135,7 @@ export default function WithdrawSection({ savingsBalance, onBack, onWithdrawComp
               type="text"
               id="input-withdraw-amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
+              onChange={(e) => setAmount(cleanNumericInput(e.target.value))}
               placeholder="উত্তোলনের পরিমাণ লিখুন"
               className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-2.5 pl-9 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal"
             />
@@ -209,7 +210,7 @@ export default function WithdrawSection({ savingsBalance, onBack, onWithdrawComp
                         <input
                           type="text"
                           value={accountNo}
-                          onChange={(e) => setAccountNo(e.target.value.replace(/[^0-9]/g, ''))}
+                          onChange={(e) => setAccountNo(cleanNumericInput(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-xs text-zinc-200 focus:outline-none focus:border-[#c5a059]/30 font-mono"
                         />
                       </div>
@@ -263,7 +264,7 @@ export default function WithdrawSection({ savingsBalance, onBack, onWithdrawComp
                 required
                 disabled={isSubmitting}
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={(e) => setPin(cleanNumericInput(e.target.value))}
                 placeholder="•••••"
                 className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-2.5 text-center font-bold tracking-widest text-md text-white focus:outline-none transition-all disabled:opacity-50"
               />

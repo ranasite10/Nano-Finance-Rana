@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { PaymentMethod } from '../types';
 import OnlineCheckoutGateway from './OnlineCheckoutGateway';
+import { cleanNumericInput } from '../utils/digitConverter';
 
 interface DepositSectionProps {
   onBack: () => void;
@@ -133,7 +134,7 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
               type="text"
               id="input-deposit-amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
+              onChange={(e) => setAmount(cleanNumericInput(e.target.value))}
               placeholder="পরিমাণ লিখুন"
               className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-3 pl-8 pr-4 font-bold text-white text-md focus:outline-none transition-all font-sans"
             />
@@ -242,7 +243,7 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
                 maxLength={5}
                 required
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={(e) => setPin(cleanNumericInput(e.target.value))}
                 placeholder="•••••"
                 className="w-full bg-zinc-950 border border-zinc-850 focus:border-[#c5a059]/40 rounded-xl py-2.5 text-center font-bold tracking-widest text-md text-white focus:outline-none transition-all"
               />

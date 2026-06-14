@@ -101,6 +101,11 @@ async function initFirebaseAndLoadDB() {
     if (data && Array.isArray(data.users)) {
       dbCache = data;
       console.log("[Firebase-Sync] Database cache successfully synchronized from Cloud Firestore!");
+      const modified = runDatabaseMigrations(dbCache);
+      if (modified) {
+        console.log("[Firebase-Sync] Database migration required on Cloud synchronization. Syncing updates back...");
+        writeDB(dbCache);
+      }
     } else {
       console.log("[Firebase-Sync] No valid Cloud database found. Initializing with local seed and uploading...");
       // Seed local DB first
@@ -306,6 +311,71 @@ const DEFAULT_SETTINGS = {
   helpCenterLogo: ""
 };
 
+// Database migrations helper to ensure settings defaults, user roles, and main admins are correctly configured
+function runDatabaseMigrations(db: any): boolean {
+  if (!db) return false;
+  let modified = false;
+
+  // Migrate settings
+  if (!db.settings) {
+    db.settings = { ...DEFAULT_SETTINGS };
+    modified = true;
+  } else {
+    if (!db.settings.depositPresets) {
+      db.settings.depositPresets = "20, 50, 100, 500";
+      modified = true;
+    }
+    if (db.settings.bkashLogo === undefined) {
+      db.settings.bkashLogo = "";
+      modified = true;
+    }
+    if (db.settings.nagadLogo === undefined) {
+      db.settings.nagadLogo = "";
+      modified = true;
+    }
+    if (db.settings.whatsappNumber === undefined) {
+      db.settings.whatsappNumber = "";
+      modified = true;
+    }
+    if (db.settings.helpCenterLogo === undefined) {
+      db.settings.helpCenterLogo = "";
+      modified = true;
+    }
+  }
+
+  // Migrate user roles
+  if (db.users && Array.isArray(db.users)) {
+    db.users.forEach((u: any) => {
+      if (!u.role) {
+        u.role = "user";
+        modified = true;
+      }
+    });
+
+    // Ensure Main Admin exists
+    const hasMainAdmin = db.users.some((u: any) => u.phone === "01700000000" || u.role === "main_admin");
+    if (!hasMainAdmin) {
+      db.users.push({
+        name: "মেইন অ্যাডমিন (Main Admin)",
+        phone: "01700000000",
+        pin: "0000",
+        accountNo: "0000000001",
+        avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=260",
+        isVerified: true,
+        savingsBalance: 0,
+        activeLoans: [],
+        emiInstallments: [],
+        transactions: [],
+        notifications: [],
+        role: "main_admin"
+      });
+      modified = true;
+    }
+  }
+
+  return modified;
+}
+
 // Helper inside server to get local persistent database (fallback)
 function readLocalDB() {
   if (!fs.existsSync(DB_PATH)) {
@@ -382,67 +452,8 @@ function readLocalDB() {
       fs.writeFileSync(DB_PATH, JSON.stringify(seed, null, 2), "utf-8");
       return seed;
     }
-    let modified = false;
-
-    // Migrate settings
-    if (!db.settings) {
-      db.settings = { ...DEFAULT_SETTINGS };
-      modified = true;
-    } else {
-      if (!db.settings.depositPresets) {
-        db.settings.depositPresets = "20, 50, 100, 500";
-        modified = true;
-      }
-      if (db.settings.bkashLogo === undefined) {
-        db.settings.bkashLogo = "";
-        modified = true;
-      }
-      if (db.settings.nagadLogo === undefined) {
-        db.settings.nagadLogo = "";
-        modified = true;
-      }
-      if (db.settings.whatsappNumber === undefined) {
-        db.settings.whatsappNumber = "";
-        modified = true;
-      }
-      if (db.settings.helpCenterLogo === undefined) {
-        db.settings.helpCenterLogo = "";
-        modified = true;
-      }
-    }
-
-    // Migrate user roles
-    if (db.users) {
-      db.users.forEach((u: any) => {
-        if (!u.role) {
-          u.role = "user";
-          modified = true;
-        }
-      });
-
-      // Ensure Main Admin exists
-      const hasMainAdmin = db.users.some((u: any) => u.phone === "01700000000" || u.role === "main_admin");
-      if (!hasMainAdmin) {
-        db.users.push({
-          name: "মেইন অ্যাডমিন (Main Admin)",
-          phone: "01700000000",
-          pin: "0000",
-          accountNo: "0000000001",
-          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=260",
-          isVerified: true,
-          savingsBalance: 0,
-          activeLoans: [],
-          emiInstallments: [],
-          transactions: [],
-          notifications: [],
-          role: "main_admin"
-        });
-        modified = true;
-      }
-
-
-    }
-
+    
+    const modified = runDatabaseMigrations(db);
     if (modified) {
       fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
     }
@@ -596,7 +607,11 @@ app.post("/api/user/get-state", (req, res) => {
   if (!phone) {
     return res.status(400).json({ error: "Phone number is required" });
   }
-  const user = getOrCreateUserProfile(phone);
+  const db = readDB();
+  const user = db.users.find((u: any) => u.phone === phone);
+  if (!user) {
+    return res.status(404).json({ error: "User profile not found", expired: true });
+  }
   res.json({ success: true, user });
 });
 
