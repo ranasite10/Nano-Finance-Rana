@@ -4,7 +4,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, doc, getDoc, setDoc, setLogLevel } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc, setLogLevel, terminate } from "firebase/firestore";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -30,6 +30,12 @@ const DB_PATH = path.join(process.cwd(), "db.json");
 let firebaseDb: any = null;
 let dbCache: any = null;
 let activeCheckouts: any[] = [];
+let lastSyncStatus: "success" | "failed" | "idle" = "idle";
+let lastSyncTime: number = 0;
+let lastSyncError: string | null = null;
+let dbSyncTimeout: NodeJS.Timeout | null = null;
+let quotaExhausted = false;
+let quotaExhaustedUntil = 0;
 
 // Active user tracking map (clientId -> { phone, role, lastActive })
 const ACTIVE_SESSIONS = new Map<string, { phone: string | null; role: string; lastActive: number }>();
@@ -100,6 +106,10 @@ async function initFirebaseAndLoadDB() {
     const data = docSnap.exists() ? docSnap.data() : null;
     if (data && Array.isArray(data.users)) {
       dbCache = data;
+      lastSyncStatus = "success";
+      lastSyncTime = Date.now();
+      lastSyncError = null;
+      quotaExhausted = false;
       console.log("[Firebase-Sync] Database cache successfully synchronized from Cloud Firestore!");
       const modified = runDatabaseMigrations(dbCache);
       if (modified) {
@@ -111,10 +121,33 @@ async function initFirebaseAndLoadDB() {
       // Seed local DB first
       dbCache = readLocalDB();
       await setDoc(docRef, dbCache);
+      lastSyncStatus = "success";
+      lastSyncTime = Date.now();
+      lastSyncError = null;
+      quotaExhausted = false;
       console.log("[Firebase-Sync] Initial seed successful in cloud Firestore.");
     }
-  } catch (error) {
-    console.error("[Firebase-Sync] Failed to initialize Firebase or load cache:", error);
+  } catch (error: any) {
+    const errorMsg = error?.message || String(error);
+    const isQuota = errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota limit exceeded") || errorMsg.includes("quota");
+    
+    lastSyncStatus = "failed";
+    if (isQuota) {
+      quotaExhausted = true;
+      quotaExhaustedUntil = Date.now() + 30 * 60 * 1000; // 30 mins cooldown
+      lastSyncError = "QUOTA_EXHAUSTED: Cloud database usage limit reached. Local-only high-performance backup is active.";
+      console.log("[Firebase-Sync] Firestore usage quota limit has been reached. System is running in Local Safe-Memory Backup Mode.");
+      if (firebaseDb) {
+        console.log("[Firebase-Sync] Shutting down active Firestore connection...");
+        try {
+          terminate(firebaseDb).catch(() => {});
+        } catch (e) {}
+        firebaseDb = null;
+      }
+    } else {
+      lastSyncError = errorMsg;
+      console.error("[Firebase-Sync] Failed to initialize Firebase or load cache:", error);
+    }
     // Fallback to local file if Firestore is offline
     dbCache = readLocalDB();
   }
@@ -122,12 +155,42 @@ async function initFirebaseAndLoadDB() {
 
 async function syncToFirestore() {
   if (!firebaseDb || !dbCache) return;
+  
+  // If we are currently experiencing a quota exhaustion cooldown, skip cloud writes completely
+  if (quotaExhausted && Date.now() < quotaExhaustedUntil) {
+    console.log("[Firebase-Sync] Sync deferred: running in high-performance Local-only Backup Mode (cooldown active).");
+    return;
+  }
+  
   try {
     const docRef = doc(firebaseDb, "nano_finance", "data");
     await setDoc(docRef, dbCache);
+    lastSyncStatus = "success";
+    lastSyncTime = Date.now();
+    lastSyncError = null;
+    quotaExhausted = false;
     console.log("[Firebase-Sync] Changes successfully persistent in Cloud Firestore.");
-  } catch (error) {
-    console.error("[Firebase-Sync] Failed to sync database cache to Firestore:", error);
+  } catch (error: any) {
+    const errorMsg = error?.message || String(error);
+    const isQuota = errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota limit exceeded") || errorMsg.includes("quota");
+    
+    lastSyncStatus = "failed";
+    if (isQuota) {
+      quotaExhausted = true;
+      quotaExhaustedUntil = Date.now() + 30 * 60 * 1000; // 30 mins cooldown
+      lastSyncError = "QUOTA_EXHAUSTED: Cloud database usage limit reached. Local-only high-performance backup is active.";
+      console.log("[Firebase-Sync] Cloud sync skipped: Firestore usage quota limits exceeded. Successfully fallbacked to Local Safe-Memory backup.");
+      if (firebaseDb) {
+        console.log("[Firebase-Sync] Shutting down active Firestore connection to protect resources...");
+        try {
+          terminate(firebaseDb).catch(() => {});
+        } catch (e) {}
+        firebaseDb = null;
+      }
+    } else {
+      lastSyncError = errorMsg;
+      console.error("[Firebase-Sync] Failed to sync database cache to Firestore:", error);
+    }
   }
 }
 
@@ -515,8 +578,14 @@ function writeDB(data: any) {
   } catch (err) {
     console.error("Local fallback DB write error:", err);
   }
-  // Sync to Cloud Firestore in background
-  syncToFirestore();
+  
+  // Debounce sync to Cloud Firestore in background to protect against daily quota exhaustion
+  if (dbSyncTimeout) {
+    clearTimeout(dbSyncTimeout);
+  }
+  dbSyncTimeout = setTimeout(() => {
+    syncToFirestore();
+  }, 8000); // 8-second debounce!
 }
 
 function getSanitizedAdmins(users: any[], requesterPhone: string) {
@@ -1346,7 +1415,15 @@ app.post("/api/user/loan/pay-emi", (req, res) => {
 // Public API: Get current website settings
 app.get("/api/settings", (req, res) => {
   const db = readDB();
-  res.json({ success: true, settings: db.settings || DEFAULT_SETTINGS });
+  res.json({ 
+    success: true, 
+    settings: db.settings || DEFAULT_SETTINGS,
+    syncStatus: {
+      status: lastSyncStatus,
+      time: lastSyncTime,
+      error: lastSyncError
+    }
+  });
 });
 
 // Admin API: Get all system settings, users, stats, and admins list
@@ -1391,6 +1468,11 @@ app.post("/api/admin/get-all-data", (req, res) => {
     subAdmins: sanitizedSubAdmins,
     mainAdmins: sanitizedMainAdmins,
     activeSessions: getActiveSessionsList(db.users),
+    syncStatus: {
+      status: lastSyncStatus,
+      time: lastSyncTime,
+      error: lastSyncError
+    },
     stats: {
       totalUsers: totalUsersCount,
       totalSubAdmins: sanitizedSubAdmins.length,

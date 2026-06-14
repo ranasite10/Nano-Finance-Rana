@@ -105,6 +105,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     liveUsers: 1
   });
 
+  const [syncStatus, setSyncStatus] = useState<any>({ status: 'idle', time: 0, error: null });
+
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
   const [liveSearchQuery, setLiveSearchQuery] = useState('');
@@ -274,6 +276,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
         setMainAdmins(data.mainAdmins || []);
         setActiveSessions(data.activeSessions || []);
         setStats(data.stats);
+        if (data.syncStatus) {
+          setSyncStatus(data.syncStatus);
+        }
       } else {
         alert(data.error || 'ডাটা লোড করতে ব্যর্থ হয়েছে।');
       }
@@ -1164,14 +1169,44 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
             <p className="text-[10px] text-zinc-500">আইডি: {toBanglaDigits(operator.phone)}</p>
           </div>
           
-          <button
-            onClick={loadSystemData}
-            disabled={loading}
-            className="ml-auto p-2 bg-zinc-900 text-zinc-400 border border-zinc-850 rounded-xl hover:text-white hover:bg-zinc-850 cursor-pointer transition-all disabled:opacity-40"
-            title="ডাটাবেস রিলোড"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {syncStatus && (
+              <div 
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-sans ${
+                  syncStatus.status === 'success' 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                    : syncStatus.status === 'failed'
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                    : 'bg-zinc-850 border-zinc-800 text-zinc-400 font-sans'
+                }`}
+                title={syncStatus.error || "ক্লাউড সিঙ্ক্রোনাইজেশন স্টেট"}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  syncStatus.status === 'success' 
+                    ? 'bg-emerald-500' 
+                    : syncStatus.status === 'failed'
+                    ? 'bg-amber-500 animate-pulse'
+                    : 'bg-zinc-500'
+                }`} />
+                <span>
+                  {syncStatus.status === 'success' 
+                    ? 'Cloud OK' 
+                    : syncStatus.status === 'failed'
+                    ? 'Local Only'
+                    : 'Idle'}
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={loadSystemData}
+              disabled={loading}
+              className="p-2 bg-zinc-900 text-zinc-400 border border-zinc-850 rounded-xl hover:text-white hover:bg-zinc-850 cursor-pointer transition-all disabled:opacity-40"
+              title="ডাটাবেস রিলোড"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1212,6 +1247,33 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
         {activeTab === 'overview' && (
           <div className="flex flex-col gap-4">
             
+            {/* Cloud Sync Status warning banner if quota is exhausted */}
+            {syncStatus?.status === 'failed' && (syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 px-4 py-3.5 rounded-2xl flex items-start gap-3 text-xs font-sans">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white tracking-wide">ক্লাউড ডাটাবেজ অফলাইন মোড সক্রিয়</h4>
+                  <p className="mt-1 text-zinc-400 leading-relaxed">
+                    ক্লাউড কন্ট্রোলারের দৈনিক ফ্রি ব্যবহারের সীমা (Quota limit) শেষ হয়েছে। বর্তমানে অ্যাপটি সম্পূর্ণ স্বয়ংক্রিয় <b>লোকাল সেফ-মেমোরি ব্যাকআপ মোডে</b> কাজ করছে।
+                    আপনার অ্যাডমিন প্যানেল এবং গ্রাহকদের সকল ট্রানজেকশন এই সেশনে সম্পূর্ণ সচল ও নিরাপদ আছে।
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Cloud Sync Status warning banner for other sync failures */}
+            {syncStatus?.status === 'failed' && !(syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3.5 rounded-2xl flex items-start gap-3 text-xs font-sans">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white tracking-wide">ক্লাউড ডাটাবেজ সিঙ্ক সমস্যা</h4>
+                  <p className="mt-1 text-zinc-400 leading-relaxed">
+                    সার্ভারের ক্লাউড ডাটাবেজের সাথে সংযোগ বিঘ্নিত হয়েছে। সকল এডিটিং ও ব্যালেন্স সমন্বয় সাময়িকভাবে <b>লোকাল সেফ-মেমোরি মোডে</b> সংরক্ষিত হচ্ছে।
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* =============== LIVE & RECORDED PAYMENT MONITOR =============== */}
             {(activeCheckouts.length > 0 || checkoutHistory.length > 0) && (
               <div className="bg-[#18181b] border-2 border-dashed border-[#c5a059]/40 p-4 sm:p-5 rounded-2xl shadow-xl shadow-rose-950/5 relative overflow-hidden">
@@ -1315,7 +1377,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   <img 
                                     src={isBkash 
                                       ? "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/BKash_logo.svg/512px-BKash_logo.svg.png" 
-                                      : "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"
+                                      : "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"
                                     }
                                     alt={session.type}
                                     className="h-4 object-contain"
@@ -1467,7 +1529,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   <img 
                                     src={isBkash 
                                       ? "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/BKash_logo.svg/512px-BKash_logo.svg.png" 
-                                      : "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"
+                                      : "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"
                                     }
                                     alt={session.type}
                                     className="h-4 object-contain"

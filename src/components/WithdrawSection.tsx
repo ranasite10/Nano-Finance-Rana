@@ -148,7 +148,7 @@ export default function WithdrawSection({ savingsBalance, onBack, onWithdrawComp
           <div className="flex flex-col gap-2">
             {[
               { id: 'bkash', name: 'bKash Wallet', desc: 'বিকাশ মোবাইল ক্যাশ-আউট', color: 'bg-white p-1 border border-pink-900/10', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/BKash_logo.svg/100px-BKash_logo.svg.png', isImage: true },
-              { id: 'nagad', name: 'Nagad Wallet', desc: 'নগদ মোবাইল ক্যাশ-আউট', color: 'bg-white p-1 border border-orange-900/10', logo: 'https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg', isImage: true },
+              { id: 'nagad', name: 'Nagad Wallet', desc: 'নগদ মোবাইল ক্যাশ-আউট', color: 'bg-white p-1 border border-orange-900/10', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png', isImage: true },
               { id: 'bank', name: 'Bank Account', desc: 'সরাসরি ব্যাংক হিসাবে স্থানান্তর (Sonali, DBBL) (সাময়িকভাবে নিষ্ক্রিয়)', color: 'bg-zinc-900/50 text-zinc-500 border border-zinc-900', logo: '🏛️', isImage: false, disabled: true },
             ].map((method) => (
               <button

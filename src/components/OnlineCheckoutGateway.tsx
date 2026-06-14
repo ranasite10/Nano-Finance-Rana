@@ -381,7 +381,7 @@ export default function OnlineCheckoutGateway({
                 />
               ) : (
                 <img 
-                  src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"} 
+                  src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"} 
                   alt="Nagad" 
                   className="w-10 h-10 object-contain animate-pulse"
                 />
@@ -466,11 +466,11 @@ export default function OnlineCheckoutGateway({
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center bg-white p-2 rounded-xl shadow-md mb-6 w-28 h-12 overflow-hidden">
+            <div className="flex items-center justify-center mb-6 w-full h-[60px] select-none">
               <img 
-                src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"}
-                alt="Nagad"
-                className="h-full object-contain"
+                src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"}
+                alt="Nagad Logo"
+                className="h-[54px] max-h-[54px] object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -536,11 +536,11 @@ export default function OnlineCheckoutGateway({
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center bg-white p-2 rounded-xl shadow-md mb-6 w-28 h-12 overflow-hidden">
+            <div className="flex items-center justify-center mb-6 w-full h-[60px] select-none">
               <img 
-                src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"}
-                alt="Nagad"
-                className="h-full object-contain"
+                src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"}
+                alt="Nagad Logo"
+                className="h-[54px] max-h-[54px] object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -754,7 +754,7 @@ export default function OnlineCheckoutGateway({
             <div className="mt-8 flex flex-col items-center select-none pb-2 pt-4 shrink-0">
               <div className="flex items-center justify-center max-w-[220px] mb-2 overflow-hidden">
                 <img 
-                  src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/c/c5/Nagad_logo.svg"}
+                  src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"}
                   alt="Nagad Logo"
                   className="h-[54px] object-contain"
                   referrerPolicy="no-referrer"
