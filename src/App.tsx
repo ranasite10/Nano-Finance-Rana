@@ -58,7 +58,8 @@ export default function App() {
   // Sync core databases with LocalStorage for flawless persistence across sessions
   const [user, setUser] = useState<User>(() => {
     const saved = localStorage.getItem('jf_user');
-    return saved ? JSON.parse(saved) : { ...INITIAL_USER, phone: '', name: '', isLoggedIn: false };
+    const parsed = saved ? JSON.parse(saved) : null;
+    return parsed && parsed.isLoggedIn ? parsed : { name: '', phone: '', isLoggedIn: false, role: 'user' };
   });
 
   const [activeScreen, setActiveScreen] = useState<ScreenId>(() => {
@@ -67,28 +68,48 @@ export default function App() {
   });
 
   const [savingsBalance, setSavingsBalance] = useState<number>(() => {
+    const savedUser = localStorage.getItem('jf_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser || !parsedUser.isLoggedIn) return 0;
+
     const saved = localStorage.getItem('jf_savings_balance');
-    return saved ? Number(saved) : 250000;
+    return saved ? Number(saved) : 0;
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const savedUser = localStorage.getItem('jf_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser || !parsedUser.isLoggedIn) return [];
+
     const saved = localStorage.getItem('jf_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [activeLoans, setActiveLoans] = useState<LoanItem[]>(() => {
+    const savedUser = localStorage.getItem('jf_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser || !parsedUser.isLoggedIn) return [];
+
     const saved = localStorage.getItem('jf_loans');
-    return saved ? JSON.parse(saved) : INITIAL_LOANS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [emiInstallments, setEmiInstallments] = useState<EmiInstallment[]>(() => {
+    const savedUser = localStorage.getItem('jf_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser || !parsedUser.isLoggedIn) return [];
+
     const saved = localStorage.getItem('jf_emi_schedule');
-    return saved ? JSON.parse(saved) : INITIAL_EMI_SCHEDULE;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    const savedUser = localStorage.getItem('jf_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser || !parsedUser.isLoggedIn) return [];
+
     const saved = localStorage.getItem('jf_notifs');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [clockTime, setClockTime] = useState('09:41');

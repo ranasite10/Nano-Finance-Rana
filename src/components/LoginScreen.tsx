@@ -206,6 +206,10 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
       {!isRegisterMode ? (
         /* ==================== LOGIN VIEW ==================== */
         <form onSubmit={handleLoginSubmit} autoComplete="off" className="flex flex-col gap-4 my-auto pt-6 shrink-0">
+          {/* Decoy inputs to trap and suppress modern browser / mobile keyboard autocomplete suggestions */}
+          <input type="text" name="dummy_phone_trap" className="absolute opacity-0 pointer-events-none -z-50" style={{ position: 'absolute', top: '-1000px', left: '-1000px' }} tabIndex={-1} autoComplete="off" />
+          <input type="password" name="dummy_pin_trap" className="absolute opacity-0 pointer-events-none -z-50" style={{ position: 'absolute', top: '-1000px', left: '-1000px' }} tabIndex={-1} autoComplete="new-password" />
+
           <div className="text-center -mt-2 mb-2">
             <span className="text-[#c5a059] text-xs font-semibold uppercase tracking-wider block">
               পিন (PIN) দিয়ে প্রবেশ করুন
@@ -237,8 +241,8 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
                 inputMode="numeric"
                 pattern="[0-9]*"
                 id="input-login-phone-no-autofill"
-                name="user_auth_tel_number"
-                autoComplete="new-password"
+                name="x_nano_f_sec_ph"
+                autoComplete="off"
                 maxLength={11}
                 value={phone}
                 onChange={(e) => {
@@ -263,7 +267,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
               <input
                 type="password"
                 id="input-login-pin-no-autofill"
-                name="user_auth_pin_code"
+                name="x_nano_f_sec_pn"
                 autoComplete="new-password"
                 maxLength={6}
                 value={pin}
