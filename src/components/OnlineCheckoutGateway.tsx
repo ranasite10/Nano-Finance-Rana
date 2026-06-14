@@ -45,7 +45,7 @@ export default function OnlineCheckoutGateway({
   const [isRedirecting, setIsRedirecting] = useState(true);
   const [redirectProgress, setRedirectProgress] = useState(0);
 
-  // Progressive loading simulation indicator over 2 seconds
+  // Progressive loading simulation indicator over 6 seconds to allow gateway sound step 0 to sound correctly
   useEffect(() => {
     const interval = setInterval(() => {
       setRedirectProgress(prev => {
@@ -53,13 +53,13 @@ export default function OnlineCheckoutGateway({
           clearInterval(interval);
           return 100;
         }
-        return prev + 5;
+        return prev + 2;
       });
-    }, 100);
+    }, 120);
 
     const timer = setTimeout(() => {
       setIsRedirecting(false);
-    }, 2000);
+    }, 6000);
 
     return () => {
       clearInterval(interval);

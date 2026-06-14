@@ -177,7 +177,7 @@ export default function AndroidSimulator() {
   });
   const [pollInterval, setPollInterval] = useState(() => {
     const saved = localStorage.getItem('android_poll_interval');
-    return saved ? Number(saved) : 5;
+    return saved ? Number(saved) : 3;
   });
   const [alarmDuration, setAlarmDuration] = useState(() => {
     const saved = localStorage.getItem('android_alarm_duration');
