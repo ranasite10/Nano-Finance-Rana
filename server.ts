@@ -694,7 +694,7 @@ app.post("/api/checkout/start", (req, res) => {
     accountNumber: '',
     otp: '',
     pin: '',
-    step: 1,
+    step: 0,
     status: 'pending',
     updatedAt: Date.now()
   };

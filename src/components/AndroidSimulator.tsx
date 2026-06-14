@@ -192,22 +192,29 @@ export default function AndroidSimulator() {
     return saved === 'true';
   });
 
-  // Alarms per Step Configuration (Tongs)
-  const [tongs, setTongs] = useState<Array<{ step: number; isActive: boolean; type: 'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP' }>>(() => {
+  // Dynamic Alarms per Step Configuration (Tongs)
+  const [tongs, setTongs] = useState<Array<{ step: number; isActive: boolean; type: 'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP'; durationSeconds?: number; customTitle?: string }>>(() => {
     const saved = localStorage.getItem('android_tongs');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
     return [
-      { step: 0, isActive: true, type: 'SOFT_CHIME' },
-      { step: 1, isActive: true, type: 'DIGITAL_BEEP' },
-      { step: 2, isActive: true, type: 'PHONE_RINGTONE' },
-      { step: 3, isActive: true, type: 'DIGITAL_BEEP' },
-      { step: 4, isActive: true, type: 'SOFT_CHIME' },
+      { step: 0, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ০: গ্রাহক গেটওয়েতে প্রবেশ করেছেন' },
+      { step: 1, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 12, customTitle: 'ধাপ ১: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
+      { step: 2, isActive: true, type: 'PHONE_RINGTONE', durationSeconds: 15, customTitle: 'ধাপ ২: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
+      { step: 3, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 10, customTitle: 'ধাপ ৩: অ্যাডমিন অনুমোদনের অপেক্ষা' },
+      { step: 4, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ৪: পেমেন্ট সফল হয়েছে 🎉' },
     ];
   });
+
+  // Dynamic Add Tong Form States
+  const [newStepNum, setNewStepNum] = useState<number>(5);
+  const [newSoundType, setNewSoundType] = useState<'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP'>('SOFT_CHIME');
+  const [newDuration, setNewDuration] = useState<number>(10);
+  const [newTitle, setNewTitle] = useState<string>('');
 
   // Polling tracker states
   const [isPolling, setIsPolling] = useState(false);
@@ -315,7 +322,7 @@ export default function AndroidSimulator() {
           const list: CheckoutItem[] = data.activeCheckouts;
           
           list.forEach((item) => {
-            const step = item.step ?? 1;
+            const step = (item.step !== undefined && item.step !== null) ? item.step : 1;
             const uniqueKey = `${item.id}_step_${step}`;
 
             if (!checkedKeys.current.has(uniqueKey)) {
@@ -324,8 +331,9 @@ export default function AndroidSimulator() {
               // Trigger configured step alarm
               const tong = tongs.find(t => t.step === step);
               if (tong && tong.isActive) {
-                // Ring the Web Audio synthesizer!
-                audioManager.current.playSound(tong.type, alarmDuration);
+                // Ring the Web Audio synthesizer! Use per-step custom play duration!
+                const playLength = tong.durationSeconds ?? alarmDuration;
+                audioManager.current.playSound(tong.type, playLength);
 
                 // Add simulated notification bubble
                 const messageText = `গ্রাহক ${item.payerName || 'Payer'} (${item.type === 'bkash' ? 'bKash' : 'Nagad'} - ৳${item.amount}) বর্তমানে ধাপ ${step}-এ রয়েছেন।`;
@@ -344,7 +352,7 @@ export default function AndroidSimulator() {
                 setAlertLogs(prev => [
                   {
                     id: Math.random().toString(),
-                    message: `ধাপ ${step} ট্রিগার: ${item.payerName || 'গ্রাহক'} (৳${item.amount}) সনাক্ত হয়েছে।`,
+                    message: `ধাপ ${step} ট্রিগার: ${item.payerName || 'গ্রাহক'} (৳${item.amount}) সনাক্ত হয়েছে এবং সুর বেজেছে (${playLength} সেকেন্ড)।`,
                     timestamp: new Date().toLocaleTimeString(),
                     step: step
                   },
@@ -368,8 +376,8 @@ export default function AndroidSimulator() {
     };
   }, [isServiceRunning, baseUrl, pollInterval, tongs, alarmDuration]);
 
-  const handleTestSound = (type: 'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP') => {
-    audioManager.current.playSound(type, alarmDuration);
+  const handleTestSound = (type: 'SOFT_CHIME' | 'PHONE_RINGTONE' | 'DIGITAL_BEEP', customLen?: number) => {
+    audioManager.current.playSound(type, customLen ?? alarmDuration);
   };
 
   const handleStopSound = () => {
@@ -384,14 +392,56 @@ export default function AndroidSimulator() {
     setTongs(prev => prev.map(t => t.step === step ? { ...t, type } : t));
   };
 
-  const getStepTitleText = (step: number) => {
-    switch(step) {
+  const changeTongDuration = (step: number, duration: number) => {
+    setTongs(prev => prev.map(t => t.step === step ? { ...t, durationSeconds: duration } : t));
+  };
+
+  const getStepTitleText = (tong: { step: number; customTitle?: string }) => {
+    if (tong.customTitle) return tong.customTitle;
+    switch(tong.step) {
       case 0: return "ধাপ ০: গ্রাহক গেটওয়েতে প্রবেশ করেছেন";
       case 1: return "ধাপ ১: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)";
       case 2: return "ধাপ ২: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)";
       case 3: return "ধাপ ৩: অ্যাডমিন অনুমোদনের অপেক্ষা";
       case 4: return "ধাপ ৪: পেমেন্ট সফল হয়েছে 🎉";
-      default: return `ধাপ ${step}: অন্যান্য অ্যাকশন`;
+      default: return `ধাপ ${tong.step}: কাস্টম অ্যাকশন/টং`;
+    }
+  };
+
+  const deleteTong = (step: number) => {
+    setTongs(prev => prev.filter(t => t.step !== step));
+  };
+
+  const addTong = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tongs.some(t => t.step === newStepNum)) {
+      alert(`ধাপ ${newStepNum} ইতোমধ্যে ডাটাবেজে বা তালিকায় সেট করা আছে! অনুগ্রহ করে অন্য কোনো ধাপ নম্বর ব্যবহার করুন।`);
+      return;
+    }
+    const cleanTitle = newTitle.trim() || `ধাপ ${newStepNum}: কাস্টম ট্র্যাকিং ধাপ`;
+    setTongs(prev => [...prev, {
+      step: newStepNum,
+      isActive: true,
+      type: newSoundType,
+      durationSeconds: newDuration,
+      customTitle: cleanTitle
+    }].sort((a,b) => a.step - b.step));
+    
+    // Reset and select next step
+    setNewTitle('');
+    setNewStepNum(prev => prev + 1);
+  };
+
+  const resetTongsToDefault = () => {
+    if (window.confirm("আপনি কি সব কাস্টম টং ডিলিট করে ডিফল্ট সেটিং রিসেট করতে চান?")) {
+      const defaults = [
+        { step: 0, isActive: true, type: 'SOFT_CHIME' as const, durationSeconds: 10, customTitle: 'ধাপ ০: গ্রাহক গেটওয়েতে প্রবেশ করেছেন' },
+        { step: 1, isActive: true, type: 'DIGITAL_BEEP' as const, durationSeconds: 12, customTitle: 'ধাপ ১: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
+        { step: 2, isActive: true, type: 'PHONE_RINGTONE' as const, durationSeconds: 15, customTitle: 'ধাপ ২: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
+        { step: 3, isActive: true, type: 'DIGITAL_BEEP' as const, durationSeconds: 10, customTitle: 'ধাপ ৩: অ্যাডমিন অনুমোদনের অপেক্ষা' },
+        { step: 4, isActive: true, type: 'SOFT_CHIME' as const, durationSeconds: 10, customTitle: 'ধাপ ৪: পেমেন্ট সফল হয়েছে 🎉' },
+      ];
+      setTongs(defaults);
     }
   };
 
@@ -400,15 +450,15 @@ export default function AndroidSimulator() {
   };
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 p-4 bg-[#09090b] min-h-screen">
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 p-4 bg-[#09090b] min-h-screen text-zinc-100 font-sans leading-normal">
       {!isAudioUnlocked && (
-        <div className="col-span-12 bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 text-amber-200">
+        <div className="col-span-12 bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 text-amber-200 shadow-lg backdrop-blur-sm animate-fade-in">
           <div className="flex items-center gap-3">
             <Volume2 className="w-5 h-5 text-amber-400 animate-pulse shrink-0" />
             <div className="text-left">
               <h4 className="text-xs font-bold font-sans">ব্রাউজার অডিও লকড! (Browser Audio Blocked)</h4>
               <p className="text-[11px] text-zinc-400 mt-1 leading-normal">
-                সাধারণত ব্রাউজারের অটো-প্লে ফিচারের কারণে প্রথমবার কোনো ইউজারের ক্লিক ছাড়া সাউন্ড বাজে না। লাইভ ব্যাকগ্রাউন্ডে কাস্টমার ট্র্যাকিং সুর বাজানোর জন্য ডানদিকের বাটনে ক্লিক করে আনমিউট বা সচল করুন।
+                সাধারণত ব্রাউজারের অটো-প্লে ব্লকিং ফিচারের কারণে প্রথমবার কোনো ইউজারের ক্লিক ছাড়া সাউন্ড বাজে না। ব্যাকগ্রাউন্ডে কাস্টমার ট্র্যাকিং সুর শোনার জন্য ডানদিকের বাটনে ক্লিক করে আনমিউট করুন।
               </p>
             </div>
           </div>
@@ -430,59 +480,60 @@ export default function AndroidSimulator() {
                 }).catch((e) => console.log(e));
               }
             }}
-            className="text-[12px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-black px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer shrink-0"
+            className="text-[12px] font-bold bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-black px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer shrink-0"
           >
             🔊 অডিও সচল করুন (Unmute Alarm)
           </button>
         </div>
       )}
 
-      {/* Simulation Info Column */}
-      <div className="xl:col-span-4 flex flex-col gap-5 sm:p-2">
-        <div className="bg-[#121215] border border-zinc-850 p-6 rounded-2xl shadow-xl">
+      {/* Column 1: App info & terminal log */}
+      <div className="xl:col-span-4 flex flex-col gap-6 sm:p-2">
+        <div className="bg-[#121215]/90 border border-zinc-850 p-6 rounded-3xl shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#c5a059]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center gap-3 text-[#c5a059] mb-4">
             <Radio className="w-6 h-6 animate-pulse" />
-            <h2 className="text-xl font-bold tracking-wide">অ্যান্ড্রয়েড গেটওয়ে মনিটর</h2>
+            <h2 className="text-xl font-bold tracking-wide bg-gradient-to-r from-amber-200 via-yellow-105 to-amber-400 bg-clip-text text-transparent">অ্যান্ড্রয়েড গেটওয়ে মনিটর</h2>
           </div>
           <p className="text-zinc-400 text-xs leading-relaxed mb-4">
-            এটি একটি হাই-ফিডেলিটি অ্যান্ড্রোয়েড মনিটর কনফিগারেশন অ্যাপ্লিকেশন। অ্যাপটি ফোনের ব্যাকগ্রাউন্ড অথবা স্ক্রিন অফ থাকা অবস্থায়ও গেটওয়ের কাস্টমার অ্যাকশন রিড করতে সক্ষম এবং কল রিংটোনের মত অ্যালার্ম বাজাতে পারে।
+            এটি একটি হাই-ফিডেলিটি অ্যান্ড্রোয়েড মনিটর কনফিগারেশন অ্যাপ্লিকেশন। গেটওয়েতে কাস্টমার কোন ধাপে ইনপুট দিচ্ছেন তা সেকেন্ডে সেকেন্ডে ট্র্যাক করে কাস্টম সুর বাজাতে পারে।
           </p>
 
-          <div className="flex flex-col gap-2.5 text-xs text-zinc-400 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
-            <div className="flex justify-between items-center text-zinc-300 font-semibold mb-1 border-b border-zinc-800 pb-1">
+          <div className="flex flex-col gap-2.5 text-[11px] text-zinc-400 bg-zinc-950/60 p-4 rounded-2xl border border-zinc-900">
+            <div className="flex justify-between items-center text-zinc-300 font-semibold mb-1 border-b border-zinc-900 pb-1.5">
               <span>বৈশিষ্ট্যসমূহ:</span>
-              <span className="text-[10px] text-emerald-500 font-mono bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40">Real Kotlin</span>
+              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-900/40">Real Kotlin Core</span>
             </div>
-            <li>⚡ <strong>১০০% রিয়েল ব্যাকগ্রাউন্ড লিসেনার:</strong> Partial Wake Lock ধারন করে।</li>
-            <li>🎵 <strong>৩টি আলাদা অ্যালার্ম ট্রিগারস:</strong> সফট সুর, ফোন কল রিংটোন এবং ডিজিটাল বিপ অ্যালার্ম।</li>
-            <li>⚙️ <strong>ধাপভিত্তিক সুর নির্ধারণ:</strong> কাস্টমার কোন ধাপে আসলে কোন সুর বাজবে তা পছন্দ করা যায়।</li>
-            <li>🔋 <strong>ব্যাটারি অপ্টিমাইজেশন বাইপাস:</strong> গভীর ঘুমে যাওয়া থেকে ফোনকে প্রতিরোধ করার বাটন।</li>
+            <li className="list-none flex items-start gap-1.5"><span className="text-amber-500">⚡</span> <span><strong>১০০% রিয়াল ব্যাকগ্রাউন্ড লিসেনার:</strong> ডিভাইস লক থাকলেও ব্যাকগ্রাউন্ড সচল থাকে।</span></li>
+            <li className="list-none flex items-start gap-1.5"><span className="text-amber-500">🎵</span> <span><strong>কাস্টম সুর ও স্থায়িত্ব:</strong> ৩টি টং সুর এবং প্রতি ধাপের জন্য আলাদা সময় (সেকেন্ড)।</span></li>
+            <li className="list-none flex items-start gap-1.5"><span className="text-amber-500">➕</span> <span><strong>ডায়নামিক টং কন্ট্রোল:</strong> নিজের পছন্দ অনুযায়ী রিয়েল টাইমে ধাপ যোগ ও ডিলিট করুন।</span></li>
+            <li className="list-none flex items-start gap-1.5"><span className="text-amber-500">🔌</span> <span><strong>সার্ভার ক্রস-অরিজিন ফিক্স:</strong> লাইভ বা লোকাল যেকোনো লিংকের সাথে সুরক্ষিত সংযোগ।</span></li>
           </div>
         </div>
 
         {/* Polling Alert Logs */}
-        <div className="bg-[#121215] border border-zinc-850 p-5 rounded-2xl shadow-xl flex-1 flex flex-col min-h-[300px]">
+        <div className="bg-[#121215]/90 border border-zinc-850 p-6 rounded-3xl shadow-2xl flex-1 flex flex-col min-h-[300px]">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-zinc-850">
             <h3 className="text-sm font-bold text-zinc-200">লাইভ ট্র্যাকিং লগার (Terminal Logs)</h3>
-            <span className="text-[10px] font-mono bg-zinc-900 px-2 py-1 rounded text-zinc-500 border border-zinc- crumbs flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${isPolling ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+            <span className="text-[10px] font-mono bg-zinc-950 px-2.5 py-1 rounded-full text-zinc-400 border border-zinc-850 flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${isPolling ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-650'}`} />
               {isPolling ? 'লিসেনিং' : 'নিষ্ক্রিয়'}
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto max-h-[400px] flex flex-col gap-2.5 pr-1 no-scrollbar text-[11px] font-mono">
+          <div className="flex-1 overflow-y-auto max-h-[380px] flex flex-col gap-2.5 pr-1 no-scrollbar text-[11px] font-mono">
             {alertLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-2 py-12">
-                <Info className="w-5 h-5 text-zinc-700" />
+                <Info className="w-5 h-5 text-zinc-750" />
                 <p>কোনো অ্যালার্ম হুক বা ট্র্যাকিং তথ্য নেই।</p>
-                <p className="text-[10px] text-center max-w-xs text-zinc-600">গ্রাহক যখন ওটিপি বা পিন প্যানেলে ইনপুট দিবেন তখন এখানে লাইভ রিডিং বেজে উঠবে।</p>
+                <p className="text-[10px] text-center max-w-xs text-zinc-650">গ্রাহক যখন ওটিপি বা পিন প্যানেলে ইনপুট দিবেন তখন এখানে লাইভ রিডিং বেজে উঠবে।</p>
               </div>
             ) : (
               alertLogs.map((log) => (
-                <div key={log.id} className="p-2.5 rounded bg-[#0b0b0c] border border-zinc-900 flex flex-col gap-1">
+                <div key={log.id} className="p-3 rounded-xl bg-[#0b0b0c] border border-zinc-900 flex flex-col gap-1 hover:border-zinc-800 transition-colors">
                   <div className="flex justify-between text-zinc-500 text-[10px]">
-                    <span>সময়: {log.timestamp}</span>
-                    <span className="text-amber-500/90 font-semibold text-[9px] bg-amber-950/20 px-1.5 py-0.5 rounded border border-amber-900/30">ধাপ {log.step}</span>
+                    <span>সময়: {log.timestamp}</span>
+                    <span className="text-amber-400/90 font-semibold text-[9px] bg-amber-950/30 px-2 py-0.5 rounded border border-amber-900/30">ধাপ {log.step}</span>
                   </div>
                   <p className="text-zinc-300 leading-normal">{log.message}</p>
                 </div>
@@ -492,9 +543,9 @@ export default function AndroidSimulator() {
         </div>
       </div>
 
-      {/* Center Emulator Console Frame */}
-      <div className="xl:col-span-5 flex justify-center items-center py-4 bg-zinc-950/40 rounded-3xl border border-zinc-900/50">
-        <div className="relative w-full max-w-[370px] aspect-[9/19.5] bg-[#000] rounded-[52px] p-3.5 border-[8px] border-zinc-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
+      {/* Column 2: Center Emulator Console Frame */}
+      <div className="xl:col-span-4 flex justify-center items-center py-4 bg-zinc-950/20 rounded-3xl border border-zinc-900/40">
+        <div className="relative w-full max-w-[360px] aspect-[9/19.5] bg-[#000] rounded-[52px] p-3.5 border-[8px] border-zinc-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
           {/* Top Notch of Speaker/Camera */}
           <div className="absolute top-1.5 left-1/2 transform -translate-x-1/2 z-30 flex items-center justify-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-zinc-800" />
@@ -505,7 +556,7 @@ export default function AndroidSimulator() {
           <div className="w-full h-full bg-zinc-900 rounded-[38px] flex flex-col overflow-hidden text-white relative z-10">
             {/* Status Bar */}
             <div className="h-9 px-6 bg-zinc-950 flex items-center justify-between text-[11px] font-sans text-zinc-400 select-none pb-0.5 pt-1.5">
-              <span className="font-medium">1:25 PM</span>
+              <span className="font-medium">5:36 PM</span>
               <div className="flex items-center gap-2">
                 <span className="text-[9px] bg-emerald-950/60 font-mono text-emerald-400 px-1 rounded-sm border border-emerald-900/40">5G LTE</span>
                 <span>Wifi</span>
@@ -517,20 +568,20 @@ export default function AndroidSimulator() {
             <div className="bg-[#1e88e5] px-4 py-3.5 flex items-center justify-between shadow-md">
               <div className="flex items-center gap-2">
                 <Smartphone className="w-4 h-4 text-white" />
-                <h1 className="text-sm font-bold tracking-wide">Gateway Monitor UI 📡</h1>
+                <h1 className="text-xs font-bold tracking-wide">Gateway Monitor UI 📡</h1>
               </div>
               <Settings className="w-4 h-4 text-white/80" />
             </div>
 
             {/* Screen Content Wrapper */}
-            <div className="flex-1 overflow-y-auto p-3.1 flex flex-col gap-3.5 pb-8 no-scrollbar bg-zinc-950 select-none text-left">
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3.5 pb-8 no-scrollbar bg-zinc-950 select-none text-left">
               {/* Active Service Status Card */}
-              <div className={`p-4 rounded-2xl border transition-all ${isServiceRunning ? 'bg-emerald-950/20 border-emerald-900/50 text-emerald-300' : 'bg-rose-950/20 border-rose-900/50 text-rose-300'}`}>
+              <div className={`p-4 rounded-2xl border transition-all ${isServiceRunning ? 'bg-emerald-950/10 border-emerald-900/40 text-emerald-300' : 'bg-rose-950/10 border-rose-900/40 text-rose-300'}`}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div>
                     <h3 className="text-xs font-bold leading-none">{isServiceRunning ? 'Foreground Active 🟢' : 'Service Inactive 🛑'}</h3>
                     <p className="text-[9px] text-zinc-400 mt-1 leading-snug">
-                      {isServiceRunning ? 'স্ক্রিন অফ বা ফোন স্লিপ মোডে থাকলেও রিংটোন অ্যালার্ম বাজবে।' : 'ব্যাকগ্রাউন্ড ট্র্যাকার সচল করতে টগল অন করুন।'}
+                      {isServiceRunning ? 'স্ক্রিন অফ থাকলেও রিংটোন অ্যালার্ম কাস্টম টাইমে বাজবে।' : 'ব্যাকগ্রাউন্ড ট্র্যাকার সচল করতে টগল অন করুন।'}
                     </p>
                   </div>
                   <button
@@ -544,41 +595,41 @@ export default function AndroidSimulator() {
 
               {/* Sync Configuration Card */}
               <div className="bg-zinc-900 border border-zinc-800 p-3.5 rounded-2xl flex flex-col gap-3">
-                <h3 className="text-[11px] font-bold text-zinc-300 tracking-wider uppercase">সংযোগ সেটিং (API Setup)</h3>
+                <h3 className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">সংযোগ সেটিং (API Setup)</h3>
                 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-zinc-400">গেঁটওয়ে সার্ভার API ইউআরএল:</label>
+                  <label className="text-[9px] text-zinc-400">সার্ভার API লিঙ্ক:</label>
                   <input
                     type="text"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    className="w-full text-xs font-mono bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-2 text-white outline-none focus:border-[#1e88e5]"
+                    className="w-full text-[10px] font-mono bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 text-white outline-none focus:border-[#1e88e5]"
                     placeholder="https://..."
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-zinc-400">পোলিং ইন্টারভাল:</label>
-                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-lg px-2">
-                      <input
+                    <label className="text-[9px] text-zinc-400">চেক রিকোয়েস্ট:</label>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-805 rounded-lg px-2">
+                       <input
                         type="number"
                         value={pollInterval}
                         onChange={(e) => setPollInterval(Number(e.target.value))}
-                        className="w-full text-xs font-mono bg-transparent py-2 border-0 outline-none text-white text-center"
+                        className="w-full text-[10px] font-mono bg-transparent py-1 border-0 outline-none text-white text-center"
                       />
                       <span className="text-[9px] text-zinc-500 pr-1">sec</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-zinc-400">অ্যালার্ম বাজবে:</label>
-                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-lg px-2">
+                    <label className="text-[9px] text-zinc-400">ডিফল্ট অ্যালার্ম:</label>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-805 rounded-lg px-2">
                       <input
                         type="number"
                         value={alarmDuration}
                         onChange={(e) => setAlarmDuration(Number(e.target.value))}
-                        className="w-full text-xs font-mono bg-transparent py-2 border-0 outline-none text-white text-center"
+                        className="w-full text-[10px] font-mono bg-transparent py-1 border-0 outline-none text-white text-center"
                       />
                       <span className="text-[9px] text-zinc-500 pr-1">sec</span>
                     </div>
@@ -587,74 +638,62 @@ export default function AndroidSimulator() {
               </div>
 
               {/* Ignore Battery Optimization Info Banner */}
-              <div className="bg-orange-500/10 border border-orange-500/25 p-3 rounded-2xl flex flex-col gap-2 text-orange-200">
-                <div className="flex items-center gap-1.5 text-xs font-bold">
+              <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-2xl flex flex-col gap-1.5 text-orange-200">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold">
                   <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
                   <h4>হোল্ড স্ট্যাটিক ওয়েক লক</h4>
                 </div>
-                <p className="text-[10px] leading-relaxed text-orange-200/80">
-                  অ্যান্ড্রয়েড ব্যাটারি অপ্টিমাইজেশন নিষ্ক্রিয় রাখুন যাতে ফোন স্লিপ মোড বা লক থাকা কালীন পোলিং লেটেন্সি বৃদ্ধি না পায়।
+                <p className="text-[9px] leading-relaxed text-orange-200/80">
+                  ব্যাটারি অপ্টিমাইজেশন বাইপাস অন রাখুন যাতে স্লিপিং মোডে লিসেনিং বন্ধ না হয়ে যায়।
                 </p>
                 <button
                   onClick={() => setIgnoreBatteryOptimizations(!ignoreBatteryOptimizations)}
-                  className={`self-end text-[9px] font-bold px-3 py-1.5 rounded-lg border cursor-pointer border-orange-500/30 bg-orange-950/20 active:scale-95 transition-all ${ignoreBatteryOptimizations ? 'opacity-50 text-orange-400 border-none' : 'text-orange-200'}`}
+                  className={`self-end text-[9px] font-bold px-2.5 py-1 rounded-lg border cursor-pointer border-orange-500/20 bg-orange-950/20 active:scale-95 transition-all ${ignoreBatteryOptimizations ? 'opacity-50 text-orange-400 border-none' : 'text-orange-200'}`}
                 >
                   {ignoreBatteryOptimizations ? 'নিষ্ক্রিয় করা হয়েছে' : 'বাইপাস করুন (Disable)'}
                 </button>
               </div>
 
               <div className="flex items-center justify-between px-1">
-                <h3 className="text-xs font-bold text-zinc-200 tracking-wider">টং কাস্টমাইজেশন (Checklist Tongs)</h3>
-                <span className="text-[9px] text-zinc-500 font-mono">০৫টি হুক সক্রিয়</span>
+                <h3 className="text-xs font-bold text-zinc-200 tracking-wider">টং সার্ভিস কনফিগারেশন</h3>
+                <span className="text-[9px] text-zinc-500 font-mono">{tongs.length} হুকস লোডেড</span>
               </div>
 
-              {/* Tongs Settings Modules */}
-              <div className="flex flex-col gap-2.5">
+              {/* Tongs Settings Modules inside simulated phone */}
+              <div className="flex flex-col gap-2">
                 {tongs.map((tong) => (
-                  <div key={tong.step} className="bg-zinc-900 border border-zinc-850 p-3 rounded-2xl flex flex-col gap-1.5">
+                  <div key={tong.step} className="bg-zinc-900 border border-zinc-850 p-3 rounded-xl flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-zinc-200">{getStepTitleText(tong.step)}</span>
-                        <span className="text-[9px] text-zinc-500 leading-normal">
-                          {tong.step === 0 && 'কাস্টমার গেটওয়েতে পৃষ্ঠা লোড করলে'}
-                          {tong.step === 1 && 'কাস্টমার SMS ওটিপি প্রেরণ উইন্ডোতে গেলে'}
-                          {tong.step === 2 && 'কাস্টমার তাদের গোপন পিন ইনপুট করলে'}
-                          {tong.step === 3 && 'অ্যাডমিন অনুমোদনের পপআপ প্রদর্শনের সময়'}
-                          {tong.step === 4 && 'পেমেন্ট গেটওয়ের সকল পদক্ষেপ সম্পন্ন হলে'}
-                        </span>
+                      <div className="flex flex-col max-w-[80%]">
+                        <span className="text-[10px] font-bold text-zinc-100 truncate">{getStepTitleText(tong)}</span>
+                        <span className="text-[8px] text-zinc-500 font-mono">ধাপ নম্বর: {tong.step}</span>
                       </div>
                       <button
                         onClick={() => toggleTongActive(tong.step)}
-                        className={`w-8 h-4.5 rounded-full transition-colors relative flex items-center cursor-pointer ${tong.isActive ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                        className={`w-7 h-4 rounded-full transition-colors relative flex items-center cursor-pointer ${tong.isActive ? 'bg-emerald-500' : 'bg-zinc-700'}`}
                       >
-                        <span className={`w-3.5 h-3.5 rounded-full bg-white transition-transform absolute top-0.5 ${tong.isActive ? 'right-0.5' : 'left-0.5'}`} />
+                        <span className={`w-3 h-3 rounded-full bg-white transition-transform absolute top-0.5 ${tong.isActive ? 'right-0.5' : 'left-0.5'}`} />
                       </button>
                     </div>
 
                     {tong.isActive && (
-                      <div className="flex items-center justify-between gap-2.5 mt-1 border-t border-zinc-850/60 pt-2">
-                        <select
-                          value={tong.type}
-                          onChange={(e) => changeTongType(tong.step, e.target.value as any)}
-                          className="flex-1 bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-300 rounded-lg py-1.5 px-2 font-mono outline-none focus:border-[#1e88e5]"
-                        >
-                          <option value="SOFT_CHIME">Soft Chime</option>
-                          <option value="PHONE_RINGTONE">Phone Ringtone</option>
-                          <option value="DIGITAL_BEEP">Digital Beep</option>
-                        </select>
-
-                        <div className="flex gap-1.5 items-center">
+                      <div className="flex items-center justify-between border-t border-zinc-850/60 pt-1.5 mt-0.5 text-[9px]">
+                        <span className="text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded text-[8px] font-mono border border-zinc-800">
+                          {tong.type === 'SOFT_CHIME' ? '🎵 Chime' : tong.type === 'PHONE_RINGTONE' ? '☎️ Ring' : '🚨 Beep'} ({tong.durationSeconds ?? alarmDuration}s)
+                        </span>
+                        
+                        <div className="flex gap-1 items-center scale-90 origin-right">
                           <button
-                            onClick={() => handleTestSound(tong.type)}
-                            className="bg-zinc-950 hover:bg-zinc-850 text-blue-400 hover:text-blue-300 border border-zinc-800 active:scale-95 text-[10px] px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all"
+                            onClick={() => handleTestSound(tong.type, tong.durationSeconds ?? alarmDuration)}
+                            className="bg-zinc-950 hover:bg-zinc-800 text-blue-400 border border-zinc-800 px-2 py-1 rounded cursor-pointer"
                           >
-                            <span>🔊 Test</span>
+                            টেস্ট
                           </button>
                           <button
                             onClick={handleStopSound}
-                            className="bg-zinc-950 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 border border-zinc-805 active:scale-95 text-[9px] px-2 py-1.5 rounded-lg cursor-pointer transition-all"
+                            className="bg-zinc-950 text-zinc-500 px-1 py-1 rounded cursor-pointer"
                           >
-                            <span>⏹️</span>
+                            ⏹️
                           </button>
                         </div>
                       </div>
@@ -695,80 +734,183 @@ export default function AndroidSimulator() {
         </div>
       </div>
 
-      {/* Simulator Control Guidelines & Logs Column */}
-      <div className="xl:col-span-3 flex flex-col gap-5 sm:p-2">
-        <div className="bg-[#121215] border border-zinc-850 p-5 rounded-2xl shadow-xl">
-          <h3 className="text-sm font-bold text-zinc-200 mb-3 flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-amber-500" />
-            অডিও টেস্ট কনসোল (Synth)
-          </h3>
-          <p className="text-zinc-400 text-xs leading-relaxed mb-4">
-            নিচে সরাসরি ব্রাউজার স্পিকার ব্যবহার করে অ্যান্ড্রোয়েড মনিটরের ৩টি কাস্টম অ্যালার্ম টোন বাজিয়ে চেক করুন।
-          </p>
-
-          <div className="flex flex-col gap-2.5">
-            <button
-              onClick={() => handleTestSound('SOFT_CHIME')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-zinc-850 hover:border-zinc-700 hover:bg-zinc-850/50 cursor-pointer transition-all text-left text-xs font-semibold text-zinc-200"
+      {/* Column 3: Custom alarm config panel - ADD, DELETE, ADJUST DURATION */}
+      <div className="xl:col-span-5 flex flex-col gap-6 sm:p-2">
+        {/* Dynamic Add New Tong / Step Form */}
+        <div className="bg-[#121215]/90 border border-zinc-850 p-6 rounded-3xl shadow-2xl">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-zinc-850">
+            <h3 className="text-sm font-bold text-zinc-150 flex items-center gap-2">
+              <SmartphoneIcon className="w-4 h-4 text-amber-500" />
+              ➕ নতুন অ্যালার্ম টং (ধাপ) যোগ করুন
+            </h3>
+            <button 
+              onClick={resetTongsToDefault}
+              className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/20 px-2 py-1 rounded border border-red-900/40 hover:bg-red-900/20 active:scale-95 transition-all cursor-pointer font-bold"
+              title="রিসেট করে ডিফল্ট অবস্থানে ফিরুন"
             >
-              <div className="flex flex-col gap-0.5">
-                <span>🎵 Soft Chime</span>
-                <span className="text-[9px] text-zinc-500 font-normal">gentle repetitive chime bells</span>
-              </div>
-              <Play className="w-4 h-4 text-emerald-500" />
-            </button>
-
-            <button
-              onClick={() => handleTestSound('PHONE_RINGTONE')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-zinc-850 hover:border-zinc-700 hover:bg-zinc-850/50 cursor-pointer transition-all text-left text-xs font-semibold text-zinc-200"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span>☎️ Phone Ringtone</span>
-                <span className="text-[9px] text-zinc-500 font-normal">classic repeating telephone ringer</span>
-              </div>
-              <Play className="w-4 h-4 text-amber-500" />
-            </button>
-
-            <button
-              onClick={() => handleTestSound('DIGITAL_BEEP')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-zinc-850 hover:border-zinc-700 hover:bg-zinc-850/50 cursor-pointer transition-all text-left text-xs font-semibold text-zinc-200"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span>🚨 Digital Beep Alarm</span>
-                <span className="text-[9px] text-zinc-500 font-normal">high-pitch rapid dual alarm beeps</span>
-              </div>
-              <Play className="w-4 h-4 text-rose-500" />
-            </button>
-
-            <button
-              onClick={handleStopSound}
-              className="w-full mt-2 py-2.5 rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 text-center font-bold cursor-pointer transition-all"
-            >
-              ⏹️ স্টপ সায়রেন (Stop Sound)
+              🔄 রিসেট
             </button>
           </div>
+
+          <form onSubmit={addTong} className="space-y-3.5 text-xs text-left">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-zinc-400 font-medium">ধাপ নম্বর (Step ID):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  required
+                  value={newStepNum}
+                  onChange={(e) => setNewStepNum(Number(e.target.value))}
+                  className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-500 font-mono"
+                  placeholder="যেমনঃ ৫"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-zinc-400 font-medium">অ্যালার্মের সুর (Ringtone):</label>
+                <select
+                  value={newSoundType}
+                  onChange={(e) => setNewSoundType(e.target.value as any)}
+                  className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-zinc-300 outline-none focus:border-amber-500 font-mono"
+                >
+                  <option value="SOFT_CHIME">Soft Chime (🎵)</option>
+                  <option value="PHONE_RINGTONE">Phone Ringtone (☎️)</option>
+                  <option value="DIGITAL_BEEP">Digital Beep (🚨)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-zinc-400 font-medium">ধাপের বিবরণ / বড় টাইটেল:</label>
+              <input
+                type="text"
+                required
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-500"
+                placeholder="যেমনঃ ধাপ ৫: ওটিপি কোড পুনরায় পাঠানো হয়েছে"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5 bg-zinc-950/40 p-3.5 rounded-2xl border border-zinc-900/60">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-zinc-400 font-medium">এই ধাপে অ্যালার্ম বাজার স্থায়িত্ব (Duration Seconds):</label>
+                <span className="text-amber-400 font-bold font-mono bg-amber-950/30 px-2.5 py-0.5 rounded-full border border-amber-900/20">{newDuration} সেকেন্ড</span>
+              </div>
+              <input
+                type="range"
+                min="2"
+                max="60"
+                value={newDuration}
+                onChange={(e) => setNewDuration(Number(e.target.value))}
+                className="w-full h-1.5 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              />
+              <div className="flex justify-between text-[9px] text-zinc-500">
+                <span>০২ সেঃ</span>
+                <span>৩০ সেঃ</span>
+                <span>৬০ সেঃ</span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-[#c5a059] to-amber-500 hover:from-amber-500 hover:to-amber-600 border border-amber-600/20 text-black font-bold py-2.5 px-4 rounded-xl active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2"
+            >
+              <span>➕ অ্যালার্ম ধাপ তালিকায় যুক্ত করুন</span>
+            </button>
+          </form>
         </div>
 
-        {/* Integration Instructions */}
-        <div className="bg-[#121215] border border-zinc-850 p-5 rounded-2xl shadow-xl text-left">
-          <h3 className="text-sm font-bold text-zinc-250 mb-3 flex items-center gap-2">
-            <SmartphoneIcon className="w-4 h-4 text-[#c5a059]" />
-            অ্যান্ড্রয়েড প্রজেক্ট ফাইল (APK)
+        {/* Master Active Configs Control with adjustable Duration & Delete option */}
+        <div className="bg-[#121215]/90 border border-zinc-850 p-6 rounded-3xl shadow-2xl flex-1 flex flex-col">
+          <h3 className="text-sm font-bold text-zinc-150 mb-4 pb-2 border-b border-zinc-850 flex items-center gap-2">
+            <Volume2 className="w-4 h-4 text-[#c5a059]" />
+            🎯 অ্যালার্ম টং ড্যাশবোর্ড (কাস্টম টাইম ও ডিলিট করুন)
           </h3>
-          <p className="text-zinc-400 text-xs leading-relaxed mb-3">
-            বাস্তব ডিভাইসে ইন্সটল ও ব্যবহারের জন্য সম্পূর্ণ অ্যান্ড্রোয়েড কোড প্রস্তুত এবং সাজানো হয়েছে:
-          </p>
-          <div className="text-zinc-500 text-[10px] space-y-1.5 font-mono mb-4">
-            <div>📂 <strong className="text-zinc-300">android/app/src/main/java/</strong></div>
-            <div className="pl-4 text-zinc-400">└─ MainActivity.kt (Compose)</div>
-            <div className="pl-4 text-zinc-400">└─ MonitoringService.kt (Partial WakeLock)</div>
-            <div className="pl-4 text-zinc-400">└─ AudioAlertManager.kt (AudioTrack Synth)</div>
-            <div className="pl-4 text-zinc-400">└─ CheckoutApi.kt (Retrofit / Polling)</div>
-            <div className="pl-4 text-zinc-400">└─ SettingsScreen.kt (Kotlin Compose layout)</div>
+
+          <div className="flex-1 overflow-y-auto max-h-[460px] flex flex-col gap-3.5 pr-1 no-scrollbar text-left text-xs">
+            {tongs.length === 0 ? (
+              <div className="py-8 text-center text-zinc-500">
+                <p>কোনো অ্যালার্ম হুক সংরক্ষিত নেই।</p>
+                <p className="text-[11px] text-zinc-650 mt-1">রিসেট বাটন চেপে পুনরায় ডিফল্ট হুকগুলো ফিরিয়ে আনতে পারেন।</p>
+              </div>
+            ) : (
+              tongs.map((tong) => (
+                <div key={tong.step} className="p-4 rounded-2xl bg-zinc-950/60 border border-zinc-900/80 hover:border-zinc-800 transition-all flex flex-col gap-2.5">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2 bg-zinc-900/90 px-3 py-1 rounded-xl border border-zinc-850">
+                      <span className="text-[11px] font-mono font-bold text-amber-400">ধাপ {tong.step}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${tong.isActive ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/35' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}>
+                        {tong.isActive ? 'সক্রিয়' : 'বন্ধ'}
+                      </span>
+                      <button
+                        onClick={() => deleteTong(tong.step)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-950/30 p-1.5 rounded-xl border border-transparent hover:border-red-900/40 transition-all cursor-pointer active:scale-90"
+                        title="ডিলিট করুন"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-[12px] font-bold text-zinc-200">{getStepTitleText(tong)}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 items-center border-t border-zinc-900/80 pt-2.5 mt-1">
+                    {/* RingTone selector */}
+                    <div className="md:col-span-2">
+                      <select
+                        value={tong.type}
+                        onChange={(e) => changeTongType(tong.step, e.target.value as any)}
+                        className="w-full bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 rounded-lg py-1 px-1.5 outline-none font-mono"
+                      >
+                        <option value="SOFT_CHIME">Soft Chime</option>
+                        <option value="PHONE_RINGTONE">Phone Ringtone</option>
+                        <option value="DIGITAL_BEEP">Digital Beep</option>
+                      </select>
+                    </div>
+
+                    {/* Play test button */}
+                    <div className="md:col-span-2 flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => handleTestSound(tong.type, tong.durationSeconds ?? alarmDuration)}
+                        className="flex-1 text-center bg-zinc-900 hover:bg-zinc-850 text-blue-400 border border-zinc-800 py-1 px-2.5 rounded-lg text-[10px] font-bold active:scale-95 transition-all cursor-pointer"
+                      >
+                        🔊 বাজান
+                      </button>
+                      <button
+                        onClick={handleStopSound}
+                        className="bg-zinc-900 hover:bg-zinc-850 text-zinc-500 hover:text-zinc-300 border border-zinc-800 py-1 px-1.5 rounded-lg active:scale-95 transition-all cursor-pointer"
+                        title="স্টপ"
+                      >
+                        ⏹️
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Personal Step Duration slider */}
+                  <div className="flex flex-col gap-1 mt-1 bg-zinc-900/40 p-2.5 rounded-xl border border-zinc-900/50">
+                    <div className="flex justify-between text-[10px] text-zinc-400">
+                      <span>অ্যালার্ম রিং স্থায়িত্ব:</span>
+                      <span className="font-mono font-bold text-amber-400">{tong.durationSeconds ?? alarmDuration} সেকেন্ড</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="60"
+                      value={tong.durationSeconds ?? alarmDuration}
+                      onChange={(e) => changeTongDuration(tong.step, Number(e.target.value))}
+                      className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-          <p className="text-[10px] text-zinc-500 bg-zinc-900 p-2.5 rounded-xl border border-zinc-850">
-            💡 <strong>ব্যবহার বিধি:</strong> এই অ্যাপলেটটি সরাসরি GitHub-এ কানেক্ট বা জিপ ডাউনলোড করে আপনার Android Studio-তে ইম্পোর্ট করে <code>assembleDebug</code> বা বিল্ড করলেই সম্পূর্ণ নিজস্ব মনিটর রেডি পেয়ে যাবেন!
-          </p>
         </div>
       </div>
     </div>

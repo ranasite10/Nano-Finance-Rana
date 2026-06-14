@@ -147,6 +147,13 @@ export default function OnlineCheckoutGateway({
     }).catch(err => console.error("Error syncing checkout update:", err));
   };
 
+  // Sync initial step 1 once redirect completes and checkout session is active
+  useEffect(() => {
+    if (!isRedirecting && checkoutId) {
+      syncCheckoutUpdate({ step: 1 });
+    }
+  }, [isRedirecting, checkoutId]);
+
   const handleAccountNumberChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9]/g, '');
     setAccountNumber(cleanVal);
