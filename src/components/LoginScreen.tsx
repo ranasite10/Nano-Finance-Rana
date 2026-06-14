@@ -20,8 +20,8 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
   const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   // Login states
-  const [phone, setPhone] = useState(initialPhone || '01712345678');
-  const [pin, setPin] = useState('9999');
+  const [phone, setPhone] = useState(initialPhone && initialPhone !== '01712345678' ? initialPhone : '');
+  const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -205,7 +205,7 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
       {/* Dynamic Forms */}
       {!isRegisterMode ? (
         /* ==================== LOGIN VIEW ==================== */
-        <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4 my-auto pt-6 shrink-0">
+        <form onSubmit={handleLoginSubmit} autoComplete="off" className="flex flex-col gap-4 my-auto pt-6 shrink-0">
           <div className="text-center -mt-2 mb-2">
             <span className="text-[#c5a059] text-xs font-semibold uppercase tracking-wider block">
               পিন (PIN) দিয়ে প্রবেশ করুন
@@ -233,8 +233,12 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
             <div className="relative flex items-center">
               <Phone className="absolute left-4 w-4 h-4 text-zinc-650" />
               <input
-                type="tel"
-                id="input-login-phone"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                id="input-login-phone-no-autofill"
+                name="user_auth_tel_number"
+                autoComplete="new-password"
                 maxLength={11}
                 value={phone}
                 onChange={(e) => {
@@ -258,7 +262,9 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
               <KeyRound className="absolute left-4 w-4 h-4 text-zinc-650" />
               <input
                 type="password"
-                id="input-login-pin"
+                id="input-login-pin-no-autofill"
+                name="user_auth_pin_code"
+                autoComplete="new-password"
                 maxLength={6}
                 value={pin}
                 onChange={(e) => {

@@ -58,7 +58,7 @@ export default function App() {
   // Sync core databases with LocalStorage for flawless persistence across sessions
   const [user, setUser] = useState<User>(() => {
     const saved = localStorage.getItem('jf_user');
-    return saved ? JSON.parse(saved) : { ...INITIAL_USER, isLoggedIn: false };
+    return saved ? JSON.parse(saved) : { ...INITIAL_USER, phone: '', name: '', isLoggedIn: false };
   });
 
   const [activeScreen, setActiveScreen] = useState<ScreenId>(() => {
