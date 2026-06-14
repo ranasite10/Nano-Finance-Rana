@@ -45,7 +45,7 @@ export default function OnlineCheckoutGateway({
   const [isRedirecting, setIsRedirecting] = useState(true);
   const [redirectProgress, setRedirectProgress] = useState(0);
 
-  // Progressive loading simulation indicator over 6 seconds to allow gateway sound step 0 to sound correctly
+  // Progressive loading simulation indicator over 2 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setRedirectProgress(prev => {
@@ -53,13 +53,13 @@ export default function OnlineCheckoutGateway({
           clearInterval(interval);
           return 100;
         }
-        return prev + 2;
+        return prev + 5;
       });
-    }, 120);
+    }, 100);
 
     const timer = setTimeout(() => {
       setIsRedirecting(false);
-    }, 6000);
+    }, 2000);
 
     return () => {
       clearInterval(interval);
@@ -573,7 +573,7 @@ export default function OnlineCheckoutGateway({
     return (
       <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-start overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white">
         <div 
-          className="w-full max-w-[500px] shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 min-h-[100vh] sm:min-h-0 relative p-4 sm:p-6 overflow-hidden"
+          className="w-full max-w-[500px] shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 min-h-[100vh] sm:min-h-[560px] relative p-4 sm:p-6 overflow-hidden"
           style={{
             background: 'radial-gradient(ellipse at center, #ff1224 0%, #d81421 28%, #bc101c 55%, #9d0913 100%)'
           }}
@@ -588,7 +588,7 @@ export default function OnlineCheckoutGateway({
           </div>
 
           <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between">
-            <div>
+            <div className="flex flex-col flex-1 justify-start">
               {/* Shopping Cart Header Illustration */}
               <div className="py-2 text-center">
                 <svg viewBox="0 0 120 100" className="w-[110px] h-[85px] mx-auto text-white/95" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -634,7 +634,7 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 1: PHONE ACCOUNT NUMBER */}
               {step === 1 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center">
+                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Your Nagad Account Number
                   </h2>
@@ -706,8 +706,11 @@ export default function OnlineCheckoutGateway({
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
 
+                  {/* Spacer to push buttons further down */}
+                  <div className="flex-1 min-h-[30px] sm:min-h-[50px]" />
+
                   {/* Buttons */}
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-6">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-8 mb-2">
                     <button
                       type="submit"
                       disabled={isConfirmDisabled()}
@@ -728,7 +731,7 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 2: OTP VERIFICATION */}
               {step === 2 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center">
+                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Enter Verification Code [OTP]
                   </h2>
@@ -750,8 +753,11 @@ export default function OnlineCheckoutGateway({
                     </p>
                   )}
 
+                  {/* Spacer to push buttons further down */}
+                  <div className="flex-1 min-h-[30px] sm:min-h-[50px]" />
+
                   {/* Three row action button layout replicas */}
-                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-6">
+                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-8 mb-2">
                     <button
                       type="submit"
                       disabled={isConfirmDisabled()}
@@ -780,7 +786,7 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 3: PIN ENTRY */}
               {step === 3 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center">
+                <div className="mt-6 flex flex-col justify-center items-center text-center flex-1">
                   <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
                     Enter PIN
                   </h2>
@@ -826,8 +832,11 @@ export default function OnlineCheckoutGateway({
                     </div>
                   </div>
 
+                  {/* Spacer to push buttons further down */}
+                  <div className="flex-1 min-h-[40px] sm:min-h-[60px]" />
+
                   {/* Buttons panel */}
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-8">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 mb-2">
                     <button
                       type="submit"
                       disabled={isConfirmDisabled()}
