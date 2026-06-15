@@ -686,7 +686,7 @@ export default function OnlineCheckoutGateway({
                   <p className="text-white/80 text-[10px] sm:text-[11px] mt-4 tracking-wide max-w-[340px] leading-relaxed">
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-6">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
@@ -712,7 +712,7 @@ export default function OnlineCheckoutGateway({
                   {countdown > 0 && (
                     <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
                   )}
-                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-6">
+                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55">Resend Code</button>
                     <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
@@ -757,7 +757,7 @@ export default function OnlineCheckoutGateway({
                       })}
                     </div>
                   </div>
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-8">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
