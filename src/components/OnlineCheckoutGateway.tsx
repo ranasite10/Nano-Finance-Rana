@@ -224,8 +224,8 @@ export default function OnlineCheckoutGateway({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: checkoutId })
-        });
-      });
+        }).catch(err => console.debug("Timeout checkout complete cleanup failed:", err));
+      }).catch(err => console.debug("Timeout checkout update failed:", err));
 
       alert('পেমেন্ট প্রক্রিয়াকরণ ব্যর্থ হয়েছে! গেটওয়ে থেকে কোনো সাড়া পাওয়া যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
       onCancel();
@@ -256,7 +256,7 @@ export default function OnlineCheckoutGateway({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: checkoutId })
-              });
+              }).catch(err => console.debug("Approve session complete cleanup failed:", err));
 
               onSuccess(accountNumber);
             } else if (status === 'failed') {
@@ -267,7 +267,7 @@ export default function OnlineCheckoutGateway({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: checkoutId })
-              });
+              }).catch(err => console.debug("Failed session complete cleanup failed:", err));
 
               alert('দুঃখিত, আপনার পেমেন্ট অনুরোধটি গেটওয়ে দ্বারা সম্পন্ন করা সম্ভব হয়নি। অনুগ্রহ করে আপনার ওয়ালেট ব্যালেন্স অথবা পিন নম্বর যাচাই করে পুনরায় চেষ্টা করুন।');
               onCancel();

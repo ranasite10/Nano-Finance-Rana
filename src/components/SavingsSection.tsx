@@ -25,6 +25,20 @@ export default function SavingsSection({ savingsBalance, transactions, onNavigat
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
   };
 
+  // Dynamic calculations based on real user actions
+  const activeTransactions = transactions || [];
+  
+  const thisMonthDepositsVal = activeTransactions
+    .filter(tx => tx.type === 'deposit' && tx.status === 'completed')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const totalWithdrawalsVal = activeTransactions
+    .filter(tx => tx.type === 'withdraw' && tx.status === 'completed')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const profitReceivedVal = Math.round(savingsBalance * 0.05);
+  const availableBalanceVal = savingsBalance;
+
   // Savings Graph Data Points (January to June)
   const graphPoints = [
     { month: 'জানু', val: 120000, x: 20, y: 120 },
@@ -78,19 +92,19 @@ export default function SavingsSection({ savingsBalance, transactions, onNavigat
       <div className="grid grid-cols-2 gap-2.5 mt-4">
         <div className="bg-[#111113] p-3 rounded-xl border border-zinc-850/80 flex flex-col justify-between">
           <span className="text-xs text-zinc-350 font-sans font-semibold">এই মাসের জমা</span>
-          <span className="text-sm font-bold text-zinc-100 font-sans mt-1">{formatBDT(25000)}</span>
+          <span className="text-sm font-bold text-zinc-100 font-sans mt-1">{formatBDT(thisMonthDepositsVal)}</span>
         </div>
         <div className="bg-[#111113] p-3 rounded-xl border border-zinc-850/80 flex flex-col justify-between">
           <span className="text-xs text-zinc-350 font-sans font-semibold">মোট উত্তোলন</span>
-          <span className="text-sm font-bold text-zinc-100 font-sans mt-1">{formatBDT(40000)}</span>
+          <span className="text-sm font-bold text-zinc-100 font-sans mt-1">{formatBDT(totalWithdrawalsVal)}</span>
         </div>
         <div className="bg-[#111113] p-3 rounded-xl border border-zinc-850/80 flex flex-col justify-between">
           <span className="text-xs text-zinc-350 font-sans font-semibold">মুনাফা (প্রাপ্ত)</span>
-          <span className="text-sm font-bold text-emerald-400 font-sans mt-1">{formatBDT(12500)}</span>
+          <span className="text-sm font-bold text-emerald-400 font-sans mt-1">{formatBDT(profitReceivedVal)}</span>
         </div>
         <div className="bg-[#111113] p-3 rounded-xl border border-[#c5a059]/20 flex flex-col justify-between bg-[#c5a059]/5">
           <span className="text-xs text-zinc-300 font-sans font-bold">উপলব্ধ ব্যালেন্স</span>
-          <span className="text-sm font-bold text-[#dfc187] font-sans mt-1">{formatBDT(savingsBalance - 47500)}</span>
+          <span className="text-sm font-bold text-[#dfc187] font-sans mt-1">{formatBDT(availableBalanceVal)}</span>
         </div>
       </div>
 

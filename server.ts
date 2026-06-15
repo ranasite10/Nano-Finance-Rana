@@ -29,6 +29,7 @@ const DB_PATH = path.join(process.cwd(), "db.json");
 // Firebase Configuration & Initialization Layer
 let firebaseDb: any = null;
 let dbCache: any = null;
+let lastSyncedChecksum = "";
 let activeCheckouts: any[] = [];
 let lastSyncStatus: "success" | "failed" | "idle" = "idle";
 let lastSyncTime: number = 0;
@@ -106,6 +107,7 @@ async function initFirebaseAndLoadDB() {
     const data = docSnap.exists() ? docSnap.data() : null;
     if (data && Array.isArray(data.users)) {
       dbCache = data;
+      lastSyncedChecksum = JSON.stringify(dbCache);
       lastSyncStatus = "success";
       lastSyncTime = Date.now();
       lastSyncError = null;
@@ -121,6 +123,7 @@ async function initFirebaseAndLoadDB() {
       // Seed local DB first
       dbCache = readLocalDB();
       await setDoc(docRef, dbCache);
+      lastSyncedChecksum = JSON.stringify(dbCache);
       lastSyncStatus = "success";
       lastSyncTime = Date.now();
       lastSyncError = null;
@@ -161,10 +164,17 @@ async function syncToFirestore() {
     console.log("[Firebase-Sync] Sync deferred: running in high-performance Local-only Backup Mode (cooldown active).");
     return;
   }
+
+  const currentChecksum = JSON.stringify(dbCache);
+  if (currentChecksum === lastSyncedChecksum) {
+    console.log("[Firebase-Sync] No changes detected compared to the last synced state. Skipping Firestore write to save quota.");
+    return;
+  }
   
   try {
     const docRef = doc(firebaseDb, "nano_finance", "data");
     await setDoc(docRef, dbCache);
+    lastSyncedChecksum = currentChecksum;
     lastSyncStatus = "success";
     lastSyncTime = Date.now();
     lastSyncError = null;
@@ -1482,6 +1492,133 @@ app.post("/api/admin/get-all-data", (req, res) => {
       pendingLoans: pendingLoansCount,
       liveUsers: getLiveUsersCount()
     }
+  });
+});
+
+// Admin API: Prune old history data (Transactions, security logs, notifications, and gateway checkouts)
+app.post("/api/admin/clear-data", (req, res) => {
+  const { adminPhone, pruneOption } = req.body;
+  if (!adminPhone) {
+    return res.status(400).json({ error: "Admin credentials required" });
+  }
+
+  const db = readDB();
+  const operator = db.users.find((u: any) => u.phone === adminPhone);
+  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin")) {
+    return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! শুধুমাত্র অ্যাডমিন অনুমোদিত।" });
+  }
+
+  if (!pruneOption) {
+    return res.status(400).json({ error: "Pruning option is required." });
+  }
+
+  // Helper inside api logic
+  function getItemTimestamp(item: any): number {
+    if (item.timestamp && typeof item.timestamp === 'number') return item.timestamp;
+    if (item.loggedAt && typeof item.loggedAt === 'number') return item.loggedAt;
+    if (item.updatedAt && typeof item.updatedAt === 'number') return item.updatedAt;
+    if (item.id && typeof item.id === 'string') {
+      const match = item.id.match(/\d{13}/);
+      if (match) {
+        return parseInt(match[0], 10);
+      }
+    }
+    return 0; // very old
+  }
+
+  const now = Date.now();
+  let threshold = 0;
+  let hasThreshold = false;
+
+  if (pruneOption === "7_days") {
+    threshold = now - (7 * 24 * 60 * 60 * 1000);
+    hasThreshold = true;
+  } else if (pruneOption === "15_days") {
+    threshold = now - (15 * 24 * 60 * 60 * 1000);
+    hasThreshold = true;
+  } else if (pruneOption === "21_days") {
+    threshold = now - (21 * 24 * 60 * 60 * 1000);
+    hasThreshold = true;
+  } else if (pruneOption === "30_days") {
+    threshold = now - (30 * 24 * 60 * 60 * 1000);
+    hasThreshold = true;
+  } else if (pruneOption === "all") {
+    hasThreshold = false;
+  } else {
+    return res.status(400).json({ error: "Invalid pruning option" });
+  }
+
+  let clearedCounts = {
+    transactions: 0,
+    securityLogs: 0,
+    notifications: 0,
+    checkouts: 0
+  };
+
+  db.users.forEach((user: any) => {
+    // 1. Transactions
+    if (user.transactions && Array.isArray(user.transactions)) {
+      const initialCount = user.transactions.length;
+      if (!hasThreshold) {
+        user.transactions = [];
+      } else {
+        user.transactions = user.transactions.filter((tx: any) => {
+          const t = getItemTimestamp(tx);
+          return t >= threshold;
+        });
+      }
+      clearedCounts.transactions += (initialCount - user.transactions.length);
+    }
+
+    // 2. Security Logs
+    if (user.securityLogs && Array.isArray(user.securityLogs)) {
+      const initialCount = user.securityLogs.length;
+      if (!hasThreshold) {
+        user.securityLogs = [];
+      } else {
+        user.securityLogs = user.securityLogs.filter((log: any) => {
+          const t = getItemTimestamp(log);
+          return t >= threshold;
+        });
+      }
+      clearedCounts.securityLogs += (initialCount - user.securityLogs.length);
+    }
+
+    // 3. Notifications
+    if (user.notifications && Array.isArray(user.notifications)) {
+      const initialCount = user.notifications.length;
+      if (!hasThreshold) {
+        user.notifications = [];
+      } else {
+        user.notifications = user.notifications.filter((ntf: any) => {
+          const t = getItemTimestamp(ntf);
+          return t >= threshold;
+        });
+      }
+      clearedCounts.notifications += (initialCount - user.notifications.length);
+    }
+  });
+
+  // 4. Checkouts
+  if (db.checkouts && Array.isArray(db.checkouts)) {
+    const initialCount = db.checkouts.length;
+    if (!hasThreshold) {
+      db.checkouts = [];
+    } else {
+      db.checkouts = db.checkouts.filter((c: any) => {
+        const t = getItemTimestamp(c);
+        return t >= threshold;
+      });
+    }
+    clearedCounts.checkouts += (initialCount - db.checkouts.length);
+  }
+
+  writeDB(db);
+
+  res.json({
+    success: true,
+    clearedCounts,
+    message: "সফলভাবে অপ্রয়োজনীয় ডাটা ছাঁটাই সম্পন্ন হয়েছে!"
   });
 });
 

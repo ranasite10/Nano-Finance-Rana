@@ -33,7 +33,8 @@ import {
   Clock,
   Bell,
   Eye,
-  Smartphone
+  Smartphone,
+  AlertTriangle
 } from 'lucide-react';
 import { User, LoanItem, Transaction } from '../types';
 import AndroidSimulator from './AndroidSimulator';
@@ -106,6 +107,11 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   });
 
   const [syncStatus, setSyncStatus] = useState<any>({ status: 'idle', time: 0, error: null });
+
+  // Database Pruning & Memory Cleanup states
+  const [selectedPruneOption, setSelectedPruneOption] = useState('30_days');
+  const [showPruneConfirm, setShowPruneConfirm] = useState(false);
+  const [pruneResult, setPruneResult] = useState<any>(null);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -934,6 +940,35 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle database pruning / memory cleanup
+  const handlePruneData = async () => {
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/admin/clear-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPhone: operator.phone,
+          pruneOption: selectedPruneOption
+        })
+      });
+      const data = await safeJsonParse(response);
+      if (response.ok && data.success) {
+        setPruneResult(data.clearedCounts);
+        alert(`ডাটাবেজ ছাঁটাই সম্পন্ন হয়েছে!\n\nমুছে ফেলা তথ্য:\n- ট্রানজেকশন: ${data.clearedCounts.transactions} টি\n- অনলাইন চেকআউট সেশন: ${data.clearedCounts.checkouts} টি\n- সিকিউরিটি লগ: ${data.clearedCounts.securityLogs} টি\n- নোটিফিকেশন: ${data.clearedCounts.notifications} টি`);
+        setShowPruneConfirm(false);
+        onStateUpdated(); // Real-time sync reload of core layout state
+      } else {
+        alert(data.error || 'ডাটা মুছে ফেলতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('সংযোগ স্থাপন করা যাচ্ছে না। দয়া করে আবার চেষ্টা করুন।');
     } finally {
       setActionLoading(false);
     }
@@ -3508,7 +3543,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
         {/* ===================== TAB 5: WEBSITE SETTINGS AND SYSTEM CONSTANTS ===================== */}
         {activeTab === 'settings' && (
-          <form onSubmit={handleUpdateSettings} className="bg-[#121215] border border-zinc-850 rounded-2xl p-4.5 flex flex-col gap-4 font-sans select-none">
+          <div className="flex flex-col gap-6 w-full">
+            <form onSubmit={handleUpdateSettings} className="bg-[#121215] border border-zinc-850 rounded-2xl p-4.5 flex flex-col gap-4 font-sans select-none">
             <h4 className="text-xs font-bold text-[#c5a059] uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-zinc-900 pb-2">
               <Settings className="w-4.5 h-4.5" />
               সিস্টেম-ব্যাপী ওয়েবসাইট কাস্টমাইজেশন
@@ -3785,7 +3821,106 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
               {actionLoading ? 'সেটিংস সেভ করা হচ্ছে...' : 'সেটিংস স্থায়ীভাবে সংরক্ষণ করুন'}
             </button>
           </form>
-        )}
+
+          {/* ডাটাবেজ ক্লিনআপ / ডাটা ছাঁটাই (Database Cleanup / Data Pruning) */}
+          <div className="bg-[#121215] border border-zinc-850 rounded-2xl p-4.5 flex flex-col gap-4 font-sans select-none">
+            <h4 className="text-xs font-bold text-rose-500 uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-zinc-900 pb-2">
+              <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+              অ্যাডভান্সড ডাটাবেজ ছাঁটাই ও মেমোরি রিলিজ (Database Pruning)
+            </h4>
+
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              আপনার হোস্টিং অ্যাকাউন্টের ডাটা ব্যাকআপ সাইজ অনেক বেশি হয়ে গেলে এখান থেকে পুরাতন ট্রানজেকশন, সেশন ও ডিটেইলস ছাঁটাই করতে পারেন। এটি গ্রাহকদের মূল সঞ্চয় ব্যালেন্স বা ঋণ হিসাবের চলমান ব্যালেন্সে কোনো ক্ষতি করবে না, শুধুমাত্র পূর্বের ট্রানজেকশন, নোটিফিকেশন ও লগসমূহের ইতিহাস ক্লিয়ার করে ডেটাবেজের সাইজ খালি করবে।
+            </p>
+
+            <div className="bg-zinc-950/60 border border-zinc-900 rounded-xl p-3 flex flex-col gap-3">
+              <label className="text-[10px] text-zinc-400 block font-semibold">ছাঁটাই করার ফিল্টার অপশন সিলেক্ট করুন:</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {[
+                  { id: '30_days', label: '৩০ দিনের অধিক পুরাতন সকল ডাটা', desc: '৩০ দিন আগের সব লগ, ট্রানজেকশন ও সেশন ছাঁটাই হবে।' },
+                  { id: '21_days', label: '২১ দিনের অধিক পুরাতন সকল ডাটা', desc: '২১ দিন আগের সব লগ, ট্রানজেকশন ও সেশন ছাঁটাই হবে।' },
+                  { id: '15_days', label: '১৫ দিনের অধিক পুরাতন সকল ডাটা', desc: '১৫ দিন আগের সব লগ, ট্রানজেকশন ও সেশন ছাঁটাই হবে।' },
+                  { id: '7_days', label: '৭ দিনের অধিক পুরাতন সকল ডাটা', desc: '৭ দিন আগের সব লগ, ট্রানজেকশন ও সেশন ছাঁটাই হবে।' },
+                  { id: 'all', label: 'সকল হিস্টোরিকাল ডাটা ক্লিয়ার করুন', desc: 'সকল ইউজারদের পূর্বের ট্রানজেকশন, নোটিফিকেশন এবং সিকিউরিটি লগ সম্পূর্ণ ক্লিয়ার হবে।' }
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSelectedPruneOption(option.id)}
+                    className={`flex flex-col text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                      selectedPruneOption === option.id
+                        ? 'bg-rose-950/20 border-rose-500/50 text-rose-200'
+                        : 'bg-zinc-900/60 border-zinc-800 text-zinc-300 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span className="text-xs font-semibold flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${selectedPruneOption === option.id ? 'bg-rose-500 animate-pulse' : 'bg-zinc-600'}`}></span>
+                      {option.label}
+                    </span>
+                    <span className="text-[9.5px] text-zinc-500 mt-1">{option.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setShowPruneConfirm(true)}
+                className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-900/50 hover:border-rose-700 py-3 px-5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                ডাটা ছাঁটাই প্রসেস শুরু করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION POPUP FOR PRUNING */}
+      {showPruneConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121215] border border-rose-900/40 w-full max-w-md rounded-2xl p-5 flex flex-col gap-4 text-xs font-sans text-zinc-300 select-none">
+            <div className="flex items-center gap-2.5 border-b border-rose-950/20 pb-3">
+              <AlertTriangle className="w-6 h-6 text-rose-500 animate-bounce" />
+              <div>
+                <h4 className="text-sm font-bold text-rose-200">আপনি কি নিশ্চিত? চূড়ান্ত ডাটা রিমুভাল সতর্কতা!</h4>
+                <p className="text-[10px] text-zinc-500">This action is irreversible and permanent.</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-400 leading-relaxed bg-rose-950/10 p-3 rounded-lg border border-rose-950/30">
+              আপনি <strong className="text-rose-400">
+                {selectedPruneOption === '30_days' && '৩০ দিনের অধিক পুরাতন'}
+                {selectedPruneOption === '21_days' && '২১ দিনের অধিক পুরাতন'}
+                {selectedPruneOption === '15_days' && '১৫ দিনের অধিক পুরাতন'}
+                {selectedPruneOption === '7_days' && '৭ দিনের অধিক পুরাতন'}
+                {selectedPruneOption === 'all' && 'সকল হিস্টোরিকাল'}
+              </strong> ডাটা ডিলিট করতে যাচ্ছেন। অনুগ্রহ করে মনে রাখবেন গ্রাহকের মূল সঞ্চয় একাউন্ট ব্যালেন্স এবং ঋণ একাউন্টের প্রধান তথ্য ঠিক থাকবে কিন্তু ডিলিট হওয়া সময়ের আগের কোনো ট্রানজেকশন তালিকা আর দেখা যাবে না।
+            </p>
+
+            <div className="flex justify-end gap-2.5 border-t border-zinc-900/50 pt-3.5">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setShowPruneConfirm(false)}
+                className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 rounded-xl transition-colors font-semibold cursor-pointer"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handlePruneData}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {actionLoading ? 'ডাটা প্রুনিং করা হচ্ছে...' : 'হ্যাঁ, ডিলিট নিশ্চিত করুন'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
         {/* ===================== TAB 6: ANDROID MONITOR SIMULATOR ===================== */}
         {activeTab === 'android' && (
