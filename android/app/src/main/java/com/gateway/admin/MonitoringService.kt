@@ -183,7 +183,8 @@ class MonitoringService : Service() {
                 if (isStep0Active) {
                     val durationSeconds = step0Tong?.durationSeconds ?: sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
                     val alarmType = step0Tong?.type ?: AudioAlertManager.AlarmType.SOFT_CHIME
-                    audioAlertManager.playSound(alarmType, durationSeconds)
+                    val volumePercent = step0Tong?.getSafeVolume() ?: 100
+                    audioAlertManager.playSound(alarmType, durationSeconds, volumePercent)
                     triggerNotificationAlert(item, 0)
 
                     alertedCheckouts.add("${item.id}_step_0")
@@ -209,7 +210,8 @@ class MonitoringService : Service() {
                 
                 if (isTongActive) {
                     val durationSeconds = tong?.durationSeconds ?: sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
-                    audioAlertManager.playSound(alarmType, durationSeconds)
+                    val volumePercent = tong?.getSafeVolume() ?: 100
+                    audioAlertManager.playSound(alarmType, durationSeconds, volumePercent)
                     triggerNotificationAlert(item, step)
                 }
             }

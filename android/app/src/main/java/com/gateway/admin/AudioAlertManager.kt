@@ -1,5 +1,6 @@
 package com.gateway.admin
 
+import android.app.NotificationManager
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -36,22 +37,62 @@ class AudioAlertManager(private val context: Context) {
         DIGITAL_BEEP
     }
 
-    fun playSound(type: AlarmType, durationSeconds: Int) {
+    fun playSound(type: AlarmType, durationSeconds: Int, volumePercent: Int = 100) {
         stopSound()
         
-        // Trigger Vibration
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val ringerMode = audioManager.ringerMode
+
+        var isDndActive = false
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Vibrate with custom pattern: 500ms vibrate, 500ms sleep, repeating
-                val timings = longArrayOf(0, 500, 500)
-                val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
-                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, 1))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(durationSeconds * 1000L)
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val filter = notificationManager.currentInterruptionFilter
+                // All allows notifications. Priority/Alarms/None means DND status is active.
+                if (filter != NotificationManager.INTERRUPTION_FILTER_ALL) {
+                    isDndActive = true
+                }
             }
         } catch (e: Exception) {
-            Log.e("AudioAlertManager", "Failed to vibrate: ${e.message}")
+            Log.e("AudioAlertManager", "Failed to get interruption filter: ${e.message}")
+        }
+
+        // Silent or Do Not Disturb: No sound, no vibration!
+        if (ringerMode == AudioManager.RINGER_MODE_SILENT || isDndActive) {
+            return
+        }
+
+        val canPlaySound = ringerMode == AudioManager.RINGER_MODE_NORMAL
+        val canVibrate = ringerMode != AudioManager.RINGER_MODE_SILENT
+
+        // Trigger Vibration if allowed
+        if (canVibrate) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // Vibrate with custom pattern: 500ms vibrate, 500ms sleep, repeating
+                    val timings = longArrayOf(0, 500, 500)
+                    val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
+                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, 1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(durationSeconds * 1000L)
+                }
+            } catch (e: Exception) {
+                Log.e("AudioAlertManager", "Failed to vibrate: ${e.message}")
+            }
+        }
+
+        // If vibration-only mode is active, do not play any alarm waves. Simply sleep and stop vibration.
+        if (!canPlaySound) {
+            playJob = scope.launch {
+                delay(durationSeconds * 1000L)
+                try {
+                    vibrator.cancel()
+                } catch (e: Exception) {
+                    // Swallowed
+                }
+            }
+            return
         }
 
         playJob = scope.launch {
@@ -106,6 +147,7 @@ class AudioAlertManager(private val context: Context) {
 
             val endTime = System.currentTimeMillis() + (durationSeconds * 1000L)
             var phase = 0.0
+            val volFactor = (volumePercent.coerceIn(0, 100) / 100.0)
 
             while (System.currentTimeMillis() < endTime && track.state == AudioTrack.STATE_INITIALIZED) {
                 val samplesCount = 4410 // 100ms batch
@@ -120,7 +162,7 @@ class AudioAlertManager(private val context: Context) {
                         
                         for (i in 0 until samplesCount) {
                             if (freq > 0) {
-                                val s = sin(phase) * 32767.0 * 0.4 * decay
+                                val s = sin(phase) * 32767.0 * 0.4 * decay * volFactor
                                 buffer[i] = s.toInt().toShort()
                                 phase = (phase + 2.0 * Math.PI * freq / sampleRate) % (2.0 * Math.PI)
                             } else {
@@ -137,7 +179,7 @@ class AudioAlertManager(private val context: Context) {
                         for (i in 0 until samplesCount) {
                             if (shouldRing) {
                                 val wave = (sin(phase) + sin(phase * 1.09)) * 0.5
-                                val s = wave * 32767.0 * 0.5
+                                val s = wave * 32767.0 * 0.5 * volFactor
                                 buffer[i] = s.toInt().toShort()
                                 phase = (phase + 2.0 * Math.PI * freq1 / sampleRate) % (2.0 * Math.PI)
                             } else {
@@ -153,7 +195,7 @@ class AudioAlertManager(private val context: Context) {
                         
                         for (i in 0 until samplesCount) {
                             if (shouldBeep) {
-                                val s = sin(phase) * 32767.0 * 0.5
+                                val s = sin(phase) * 32767.0 * 0.5 * volFactor
                                 buffer[i] = s.toInt().toShort()
                                 phase = (phase + 2.0 * Math.PI * freq / sampleRate) % (2.0 * Math.PI)
                             } else {

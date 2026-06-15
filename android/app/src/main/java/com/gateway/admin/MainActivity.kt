@@ -53,14 +53,12 @@ class MainActivity : ComponentActivity() {
     private fun prefillServerUrl() {
         val prefs = getSharedPreferences("gateway_monitor_prefs", Context.MODE_PRIVATE)
         val currentUrl = prefs.getString("pref_base_url", "") ?: ""
-        val targetUrl = "https://ais-dev-cjko7cdnugq6kua6si75zu-959125417736.asia-southeast1.run.app"
         
-        val isTruncated = currentUrl.contains("ais-") && !currentUrl.endsWith(".app") && !currentUrl.endsWith(".app/")
-        val isMockUrl = currentUrl.isBlank() || currentUrl == "https://example.com"
-        val isPreUrl = currentUrl.contains("ais-pre-")
-        
-        if (isMockUrl || isTruncated || isPreUrl) {
-            viewModel.updateBaseUrl(targetUrl)
+        // Remove the default URL and keep it blank so users can put their own.
+        // If current URL contains the old default run.app URL or is example.com, we reset it to blank.
+        val isOldDefault = currentUrl.contains("ais-dev-cjko7cdnugq6kua6si75zu") || currentUrl == "https://example.com"
+        if (isOldDefault) {
+            viewModel.updateBaseUrl("")
         }
     }
 

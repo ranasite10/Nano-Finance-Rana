@@ -38,6 +38,7 @@ fun SettingsScreen(
         var subtitleInput by remember { mutableStateOf(if (isEdit) editingTong!!.subtitle else "") }
         var selectedAlarmType by remember { mutableStateOf(if (isEdit) editingTong!!.type else AudioAlertManager.AlarmType.DIGITAL_BEEP) }
         var durationInput by remember { mutableStateOf(if (isEdit) editingTong!!.durationSeconds.toString() else "10") }
+        var volumeInput by remember { mutableStateOf(if (isEdit) (editingTong!!.volumePercent ?: 100).toString() else "100") }
 
         AlertDialog(
             onDismissRequest = {
@@ -122,6 +123,22 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    OutlinedTextField(
+                        value = volumeInput,
+                        onValueChange = { volumeInput = it },
+                        label = { Text("ভলিউম কতো শতাংশ (Volume: 0-100%)", color = Color.LightGray) },
+                        placeholder = { Text("যেমন: 100", color = Color.Gray) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFFC5A059),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Text("সাউন্ড অ্যালার্ম নির্বাচন করুন:", fontSize = 12.sp, color = Color.LightGray)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -153,11 +170,12 @@ fun SettingsScreen(
                     onClick = {
                         val step = stepInput.toIntOrNull() ?: 0
                         val duration = durationInput.toIntOrNull() ?: 10
+                        val volume = volumeInput.toIntOrNull()?.coerceIn(0, 100) ?: 100
                         if (isEdit) {
-                            viewModel.editTong(step, titleInput, subtitleInput, selectedAlarmType, duration)
+                            viewModel.editTong(step, titleInput, subtitleInput, selectedAlarmType, duration, volume)
                             editingTong = null
                         } else {
-                            viewModel.addTong(step, titleInput, subtitleInput, selectedAlarmType, duration)
+                            viewModel.addTong(step, titleInput, subtitleInput, selectedAlarmType, duration, volume)
                             showAddDialog = false
                         }
                     },
@@ -541,7 +559,7 @@ fun SettingsScreen(
                                         color = Color.LightGray
                                     )
                                     Text(
-                                        "সময়সীমা: ${tong.durationSeconds} সেকেন্ড",
+                                        "সময়সীমা: ${tong.durationSeconds} সেকেন্ড | ভলিউম: ${tong.getSafeVolume()}%",
                                         fontSize = 11.sp,
                                         color = Color(0xFFC5A059),
                                         fontWeight = FontWeight.SemiBold

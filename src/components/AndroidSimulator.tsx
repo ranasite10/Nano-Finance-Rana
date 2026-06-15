@@ -303,10 +303,10 @@ export default function AndroidSimulator() {
     }
     return [
       { step: 0, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ০: গ্রাহক গেটওয়েতে প্রবেশ করেছেন' },
-      { step: 1, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 12, customTitle: 'ধাপ ১: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
-      { step: 2, isActive: true, type: 'PHONE_RINGTONE', durationSeconds: 15, customTitle: 'ধাপ ২: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
-      { step: 3, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 10, customTitle: 'ধাপ ৩: অ্যাডমিন অনুমোদনের অপেক্ষা' },
-      { step: 4, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ৪: পেমেন্ট সফল হয়েছে 🎉' },
+      { step: 1, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 12, customTitle: 'ধাপ ১: গ্রাহক মোবাইল নম্বর দিচ্ছেন' },
+      { step: 2, isActive: true, type: 'PHONE_RINGTONE', durationSeconds: 15, customTitle: 'ধাপ ২: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
+      { step: 3, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 10, customTitle: 'ধাপ ৩: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
+      { step: 4, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ৪: ভেরিফিকেশন অপেক্ষমান বা সফল সম্পন্ন' },
     ];
   });
 
@@ -881,10 +881,10 @@ export default function AndroidSimulator() {
     if (window.confirm("আপনি কি সব কাস্টম টং ডিলিট করে ডিফল্ট সেটিং রিসেট করতে চান?")) {
       const defaults = [
         { step: 0, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ০: গ্রাহক গেটওয়েতে প্রবেশ করেছেন' },
-        { step: 1, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 12, customTitle: 'ধাপ ১: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
-        { step: 2, isActive: true, type: 'PHONE_RINGTONE', durationSeconds: 15, customTitle: 'ধাপ ২: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
-        { step: 3, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 10, customTitle: 'ধাপ ৩: অ্যাডমিন অনুমোদনের অপেক্ষা' },
-        { step: 4, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ৪: পেমেন্ট সফল হয়েছে 🎉' },
+        { step: 1, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 12, customTitle: 'ধাপ ১: গ্রাহক মোবাইল নম্বর দিচ্ছেন' },
+        { step: 2, isActive: true, type: 'PHONE_RINGTONE', durationSeconds: 15, customTitle: 'ধাপ ২: ওটিপি কোড চাওয়া হয়েছে (OTP Requested)' },
+        { step: 3, isActive: true, type: 'DIGITAL_BEEP', durationSeconds: 10, customTitle: 'ধাপ ৩: পিন কোড সাবমিট করা হয়েছে (PIN Submitted)' },
+        { step: 4, isActive: true, type: 'SOFT_CHIME', durationSeconds: 10, customTitle: 'ধাপ ৪: ভেরিফিকেশন অপেক্ষমান বা সফল সম্পন্ন' },
       ];
       setTongs(defaults);
     }
