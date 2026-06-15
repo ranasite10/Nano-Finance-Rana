@@ -1,6 +1,8 @@
 package com.gateway.admin
 
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Body
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -8,6 +10,29 @@ data class ActiveCheckoutsResponse(
     val success: Boolean,
     val activeCheckouts: List<CheckoutItem>?,
     val history: List<CheckoutItem>?
+)
+
+data class CheckDeviceRequest(
+    val deviceId: String,
+    val deviceName: String
+)
+
+data class CheckDeviceResponse(
+    val success: Boolean,
+    val status: String,
+    val error: String?
+)
+
+data class ActivateDeviceRequest(
+    val deviceId: String,
+    val deviceName: String,
+    val licenseKey: String
+)
+
+data class ActivateDeviceResponse(
+    val success: Boolean,
+    val message: String?,
+    val error: String?
 )
 
 data class CheckoutItem(
@@ -24,6 +49,12 @@ data class CheckoutItem(
 interface CheckoutService {
     @GET("api/checkout/active")
     suspend fun getActiveCheckouts(): ActiveCheckoutsResponse
+
+    @POST("api/devices/check")
+    suspend fun checkDevice(@Body request: CheckDeviceRequest): CheckDeviceResponse
+
+    @POST("api/devices/activate")
+    suspend fun activateDevice(@Body request: ActivateDeviceRequest): ActivateDeviceResponse
 }
 
 object RetrofitClient {

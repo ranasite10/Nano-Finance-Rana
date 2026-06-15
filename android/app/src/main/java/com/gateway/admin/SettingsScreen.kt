@@ -52,12 +52,111 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Service Status Manager Card
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (state.isServiceRunning) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                )
-            ) {
+            if (state.deviceStatus != "approved") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (state.deviceStatus == "blocked") Color(0xFFFFEBEE) else Color(0xFFF5F5F5)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (state.deviceStatus == "blocked") "ডিভাইস ব্লকড ⛔" else "অ্যাক্টিভেশন প্রয়োজন 🔐",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = if (state.deviceStatus == "blocked") Color(0xFFC62828) else Color(0xFF0D47A1)
+                        )
+
+                        Text(
+                            text = if (state.deviceStatus == "blocked") {
+                                "আপনার এই ডিভাইসটি অ্যাডমিন ব্লক করেছেন! কোনো লাইভ ট্র্যাকিং পোলিং বা ব্যাকগ্রাউন্ড সার্ভিস চালু করা সম্ভব নয়।"
+                            } else {
+                                "এটি একটি নতুন অননুমোদিত ডিভাইস। এই মনিটর অ্যাপটি সচল করার জন্য মেইন অ্যাডমিনের কাছ থেকে লাইসেন্স কী (Serial Key) দিয়ে ডিভাইস এক্টিভেট করুন।"
+                            },
+                            fontSize = 13.sp,
+                            color = Color.DarkGray,
+                            lineHeight = 18.sp
+                        )
+
+                        OutlinedTextField(
+                            value = state.baseUrl,
+                            onValueChange = { viewModel.updateBaseUrl(it) },
+                            label = { Text("Gateway Web Server API Url") },
+                            placeholder = { Text("https://your-domain.run.app") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("ডিভাইসের বিবরণী:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Text("ডিভাইস আইডি (ID): ${state.deviceId}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("মডেল (Name): ${state.deviceName}", fontSize = 11.sp, color = Color.DarkGray)
+                            }
+                        }
+
+                        if (state.deviceStatus != "blocked") {
+                            var activationKeyInput by remember { mutableStateOf("") }
+                            
+                            OutlinedTextField(
+                                value = activationKeyInput,
+                                onValueChange = { activationKeyInput = it },
+                                label = { Text("লাইসেন্স অ্যাক্টিভেশন কী") },
+                                placeholder = { Text("RING-XXXX-XXXX-XXXX") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            if (state.activationError != null) {
+                                Text(
+                                    text = state.activationError ?: "",
+                                    color = Color(0xFFC62828),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.align(Alignment.Start)
+                                )
+                            }
+
+                            Button(
+                                onClick = { viewModel.activateDeviceWithKey(activationKeyInput) },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5)),
+                                enabled = !state.isCheckingStatus && state.baseUrl.isNotBlank()
+                            ) {
+                                if (state.isCheckingStatus) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                                } else {
+                                    Text("এক্টিভেট করুন", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.checkDeviceStatusFromServer() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !state.isCheckingStatus && state.baseUrl.isNotBlank()
+                        ) {
+                            Text("পুনরায় যাচাই করুন")
+                        }
+                    }
+                }
+            } else {
+                // Service Status Manager Card
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (state.isServiceRunning) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                    )
+                ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -291,6 +390,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

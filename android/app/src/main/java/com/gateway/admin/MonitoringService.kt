@@ -71,10 +71,36 @@ class MonitoringService : Service() {
             while (isActive) {
                 val baseUrl = sharedPreferences.getString("pref_base_url", "") ?: ""
                 val pollIntervalSeconds = sharedPreferences.getInt("pref_poll_interval", 5).coerceIn(2, 60)
+                val deviceId = sharedPreferences.getString("pref_device_id", "") ?: ""
+                val brand = android.os.Build.MANUFACTURER ?: "Android"
+                val model = android.os.Build.MODEL ?: "Device"
+                val deviceName = "$brand $model"
                 
                 if (baseUrl.isNotBlank()) {
                     try {
                         val api = RetrofitClient.getService(baseUrl)
+                        
+                        // Dynamically check device licensing status first before pulling checkouts
+                        if (deviceId.isNotBlank()) {
+                            val checkResponse = api.checkDevice(CheckDeviceRequest(deviceId, deviceName))
+                            if (checkResponse.success) {
+                                sharedPreferences.edit().putString("pref_device_status", checkResponse.status).apply()
+                                if (checkResponse.status != "approved") {
+                                    val errStatusMsg = if (checkResponse.status == "blocked") {
+                                        "আপনার মোবাইল ডিভাইসটি ব্লক করা হয়েছে!"
+                                    } else {
+                                        "অ্যাক্টিভেশন প্রয়োজন! লাইসেন্স কী দিন।"
+                                    }
+                                    sharedPreferences.edit()
+                                        .putString("pref_last_sync_status", "Error: $errStatusMsg")
+                                        .apply()
+                                    updateNotification(errStatusMsg)
+                                    stopSelf() // Stop this foreground service immediately
+                                    break
+                                }
+                            }
+                        }
+
                         val response = api.getActiveCheckouts()
                         
                         val timeStr = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault()).format(java.util.Date())

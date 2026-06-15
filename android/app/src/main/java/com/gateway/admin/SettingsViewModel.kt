@@ -1,18 +1,22 @@
 package com.gateway.admin
-
+ 
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+ 
 data class TongConfig(
     val step: Int,
     val isActive: Boolean,
     val type: AudioAlertManager.AlarmType
 )
-
+ 
 data class SettingsState(
     val baseUrl: String = "https://example.com",
     val pollingInterval: Int = 5,
@@ -20,28 +24,48 @@ data class SettingsState(
     val tongs: List<TongConfig> = emptyList(),
     val isServiceRunning: Boolean = false,
     val lastSyncStatus: String = "Never synced",
-    val lastSyncTime: String = "-"
+    val lastSyncTime: String = "-",
+    val deviceId: String = "",
+    val deviceStatus: String = "pending_activation", // pending_activation, approved, blocked
+    val deviceName: String = "",
+    val isCheckingStatus: Boolean = false,
+    val activationError: String? = null
 )
-
+ 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
     private val prefs = context.getSharedPreferences("gateway_monitor_prefs", Context.MODE_PRIVATE)
     private val audioAlertManager = AudioAlertManager(context)
-
+ 
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state.asStateFlow()
-
+ 
     private val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "pref_last_sync_status" || key == "pref_last_sync_time" || key == "pref_service_running" || key == "pref_base_url") {
+        if (key == "pref_last_sync_status" || key == "pref_last_sync_time" || key == "pref_service_running" || key == "pref_base_url" || key == "pref_device_status") {
             loadSettings()
         }
     }
-
+ 
     init {
         prefs.registerOnSharedPreferenceChangeListener(listener)
+        // Set up unique persistent device ID
+        var deviceId = prefs.getString("pref_device_id", "") ?: ""
+        if (deviceId.isBlank()) {
+            val androidId = android.provider.Settings.Secure.getString(
+                context.contentResolver, 
+                android.provider.Settings.Secure.ANDROID_ID
+            )
+            deviceId = if (!androidId.isNullOrBlank() && androidId != "9774d56d682e549c") {
+                androidId
+            } else {
+                java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16)
+            }
+            prefs.edit().putString("pref_device_id", deviceId).apply()
+        }
         loadSettings()
+        checkDeviceStatusFromServer()
     }
-
+ 
     fun loadSettings() {
         // Dynamically prefill with a smart default or loaded preference
         val baseUrl = prefs.getString("pref_base_url", "") ?: ""
@@ -50,6 +74,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val isServiceRunning = prefs.getBoolean("pref_service_running", false)
         val lastSyncStatus = prefs.getString("pref_last_sync_status", "Never synced") ?: "Never synced"
         val lastSyncTime = prefs.getString("pref_last_sync_time", "-") ?: "-"
+        
+        val deviceId = prefs.getString("pref_device_id", "") ?: ""
+        val deviceStatus = prefs.getString("pref_device_status", "pending_activation") ?: "pending_activation"
+        
+        val brand = android.os.Build.MANUFACTURER ?: "Android"
+        val model = android.os.Build.MODEL ?: "Device"
+        val deviceName = "$brand $model"
         
         val tongs = (0..4).map { step ->
             val isActive = prefs.getBoolean("pref_tong_step_${step}_active", true)
@@ -61,7 +92,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
             TongConfig(step, isActive, type)
         }
-
+ 
         _state.value = SettingsState(
             baseUrl = baseUrl,
             pollingInterval = pollingInterval,
@@ -69,7 +100,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             tongs = tongs,
             isServiceRunning = isServiceRunning,
             lastSyncStatus = lastSyncStatus,
-            lastSyncTime = lastSyncTime
+            lastSyncTime = lastSyncTime,
+            deviceId = deviceId,
+            deviceStatus = deviceStatus,
+            deviceName = deviceName,
+            isCheckingStatus = false,
+            activationError = null
         )
     }
 
@@ -129,6 +165,104 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             MonitoringService.stopService(context)
         }
         _state.value = _state.value.copy(isServiceRunning = enable)
+    }
+
+    fun checkDeviceStatusFromServer() {
+        val baseUrl = _state.value.baseUrl
+        val deviceId = _state.value.deviceId
+        val deviceName = _state.value.deviceName
+        if (baseUrl.isBlank() || deviceId.isBlank()) return
+
+        _state.value = _state.value.copy(isCheckingStatus = true, activationError = null)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Strip trailing slash if any and sanitize URL
+                val sanitizedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+                val api = RetrofitClient.getService(sanitizedUrl)
+                val response = api.checkDevice(CheckDeviceRequest(deviceId, deviceName))
+                if (response.success) {
+                    prefs.edit().putString("pref_device_status", response.status).apply()
+                    withContext(Dispatchers.Main) {
+                        _state.value = _state.value.copy(
+                            deviceStatus = response.status,
+                            isCheckingStatus = false
+                        )
+                        // If device gets blocked, we must stop the monitoring service
+                        if (response.status == "blocked" || response.status == "pending_activation") {
+                            if (_state.value.isServiceRunning) {
+                                toggleService(false)
+                            }
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _state.value = _state.value.copy(isCheckingStatus = false)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _state.value = _state.value.copy(
+                        isCheckingStatus = false,
+                        activationError = e.localizedMessage
+                    )
+                }
+            }
+        }
+    }
+
+    fun activateDeviceWithKey(key: String) {
+        val baseUrl = _state.value.baseUrl
+        val deviceId = _state.value.deviceId
+        val deviceName = _state.value.deviceName
+        if (baseUrl.isBlank() || deviceId.isBlank()) {
+            _state.value = _state.value.copy(activationError = "Error: Please check Server URL first.")
+            return
+        }
+        if (key.trim().isBlank()) {
+            _state.value = _state.value.copy(activationError = "লাইসেন্স কোড টাইপ করুন")
+            return
+        }
+
+        _state.value = _state.value.copy(isCheckingStatus = true, activationError = null)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val sanitizedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+                val api = RetrofitClient.getService(sanitizedUrl)
+                val response = api.activateDevice(ActivateDeviceRequest(deviceId, deviceName, key.trim().toUpperCase()))
+                if (response.success) {
+                    prefs.edit().putString("pref_device_status", "approved").apply()
+                    withContext(Dispatchers.Main) {
+                        _state.value = _state.value.copy(
+                            deviceStatus = "approved",
+                            isCheckingStatus = false,
+                            activationError = null
+                        )
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _state.value = _state.value.copy(
+                            isCheckingStatus = false,
+                            activationError = response.error ?: "ভুল অ্যাক্টিভেশন কি দিন"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                val rawMsg = e.localizedMessage ?: "Connection error"
+                val userFriendlyMsg = if (rawMsg.contains("400")) {
+                    "ভুল অ্যাক্টিভেশন কী! অনুগ্রহ করে সঠিক এক্টিভেশন কোডটি প্রদান করুন।"
+                } else {
+                    "সংযোগ করতে ব্যর্থ হয়েছে। লাইভ সার্ভার চালু কী না এবং ইউআরএলটি চেক করুন।"
+                }
+                withContext(Dispatchers.Main) {
+                    _state.value = _state.value.copy(
+                        isCheckingStatus = false,
+                        activationError = userFriendlyMsg
+                    )
+                }
+            }
+        }
     }
 
     override fun onCleared() {
