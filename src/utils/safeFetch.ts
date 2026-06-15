@@ -8,12 +8,21 @@ export async function safeFetchJson<T = any>(
 ): Promise<T | null> {
   try {
     const response = await fetch(input, init);
+    const contentType = response.headers.get("content-type");
+    const isJson = contentType && contentType.includes("application/json");
+
     if (!response.ok) {
       console.warn(`Fetch to ${input} failed with status: ${response.status}`);
+      if (isJson) {
+        try {
+          return await response.json();
+        } catch (e) {
+          console.warn("Failed to parse error JSON", e);
+        }
+      }
       return null;
     }
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
+    if (!isJson) {
       console.warn(`Fetch to ${input} did not return JSON. Content-type was: ${contentType}`);
       return null;
     }
