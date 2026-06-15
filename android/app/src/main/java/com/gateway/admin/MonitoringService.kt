@@ -162,7 +162,7 @@ class MonitoringService : Service() {
         val tongsJson = sharedPreferences.getString("pref_dynamic_tongs", "") ?: ""
         val tongs: List<TongConfig> = if (tongsJson.isNotBlank()) {
             try {
-                val listType = object : com.google.gson.TypeToken<List<TongConfig>>() {}.type
+                val listType = object : com.google.gson.reflect.TypeToken<List<TongConfig>>() {}.type
                 gson.fromJson(tongsJson, listType)
             } catch (e: Exception) {
                 emptyList()
