@@ -1104,6 +1104,181 @@ app.post("/api/user/change-pin", (req, res) => {
   res.json({ success: true, user });
 });
 
+// ==========================================
+// ANDROID DEVICE LICENSING & SECURITY CONTROLLER
+// ==========================================
+
+// Helper to get device and key structures
+const getDeviceListAndKeys = (db: any) => {
+  if (!db.registeredDevices) db.registeredDevices = [];
+  if (!db.licenseKeys) db.licenseKeys = [];
+  return {
+    devices: db.registeredDevices,
+    keys: db.licenseKeys
+  };
+};
+
+// Check dynamic status of a device ID
+app.post("/api/devices/check", (req, res) => {
+  const { deviceId, deviceName } = req.body;
+  if (!deviceId) {
+    return res.status(400).json({ error: "Device ID is required" });
+  }
+
+  const db = readDB();
+  const { devices } = getDeviceListAndKeys(db);
+  
+  let existingDevice = devices.find((d: any) => d.deviceId === deviceId);
+
+  // If device doesn't exist, register as pending_activation
+  if (!existingDevice) {
+    existingDevice = {
+      deviceId,
+      deviceName: deviceName || "Unknown Android Device",
+      activatedAt: null,
+      status: "pending_activation"
+    };
+    devices.push(existingDevice);
+    writeDB(db);
+  }
+
+  res.json({
+    success: true,
+    status: existingDevice.status,
+    device: existingDevice
+  });
+});
+
+// Activate a device using a License Key
+app.post("/api/devices/activate", (req, res) => {
+  const { deviceId, deviceName, licenseKey } = req.body;
+  if (!deviceId || !licenseKey) {
+    return res.status(400).json({ error: "ডিভাইস আইডি এবং লাইসেন্স অ্যাক্টিভেশন কি আবশ্যক।" });
+  }
+
+  const db = readDB();
+  const { devices, keys } = getDeviceListAndKeys(db);
+
+  // Clean key formatting
+  const formattedKey = licenseKey.trim().toUpperCase();
+  const keyIndex = keys.findIndex((k: any) => k.key === formattedKey);
+
+  if (keyIndex === -1) {
+    return res.status(400).json({ error: "ভুল লাইসেন্স কি! অনুগ্রহ করে সঠিক এক্টিভেশন কোডটি প্রদান করুন।" });
+  }
+
+  const activeKey = keys[keyIndex];
+  if (activeKey.status === "used") {
+    return res.status(400).json({ error: "এই লাইসেন্স কি-টি ইতিমধ্যে অন্য একটি ডিভাইসে ব্যবহৃত হয়েছে!" });
+  }
+
+  // Update activation key to used
+  activeKey.status = "used";
+  activeKey.usedByDevice = deviceId;
+  activeKey.usedAt = Date.now();
+
+  // Find or create device and elevate status in the database
+  let devIndex = devices.findIndex((d: any) => d.deviceId === deviceId);
+  if (devIndex === -1) {
+    devices.push({
+      deviceId,
+      deviceName: deviceName || "Android Smartphone",
+      activatedAt: Date.now(),
+      status: "approved"
+    });
+  } else {
+    devices[devIndex].status = "approved";
+    devices[devIndex].activatedAt = Date.now();
+    devices[devIndex].deviceName = deviceName || devices[devIndex].deviceName;
+  }
+
+  writeDB(db);
+  res.json({ success: true, message: "ডিভাইস অ্যাক্টিভেশন সফলভাবে সম্পন্ন হয়েছে!" });
+});
+
+// Admin API to fetch registered devices list & keys
+app.get("/api/devices/list", (req, res) => {
+  const db = readDB();
+  const { devices, keys } = getDeviceListAndKeys(db);
+  res.json({
+    success: true,
+    devices,
+    licenseKeys: keys
+  });
+});
+
+// Admin API to generate random serial license keys (e.g. RING-XXXX-XXXX)
+app.post("/api/devices/generate-key", (req, res) => {
+  const db = readDB();
+  const { keys } = getDeviceListAndKeys(db);
+
+  // Generate keys format RING-XXXX-XXXX-XXXX
+  const part1 = Math.random().toString(36).substr(2, 4).toUpperCase();
+  const part2 = Math.random().toString(36).substr(2, 4).toUpperCase();
+  const part3 = Math.random().toString(36).substr(2, 4).toUpperCase();
+  const newLicenceKey = `RING-${part1}-${part2}-${part3}`;
+
+  keys.push({
+    key: newLicenceKey,
+    status: "active",
+    usedByDevice: null,
+    usedAt: null
+  });
+
+  writeDB(db);
+  res.json({ success: true, key: newLicenceKey, licenseKeys: keys });
+});
+
+// Admin API to delete an active or used key
+app.post("/api/devices/delete-key", (req, res) => {
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ error: "কি আবশ্যক।" });
+
+  const db = readDB();
+  const { keys } = getDeviceListAndKeys(db);
+
+  const idx = keys.findIndex((k: any) => k.key === key);
+  if (idx !== -1) {
+    keys.splice(idx, 1);
+    writeDB(db);
+  }
+  res.json({ success: true, licenseKeys: keys });
+});
+
+// Admin API to approve or block a registered device
+app.post("/api/devices/toggle", (req, res) => {
+  const { deviceId, status } = req.body; // status: 'approved' | 'blocked' | 'pending_activation'
+  if (!deviceId || !status) {
+    return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
+  }
+
+  const db = readDB();
+  const { devices } = getDeviceListAndKeys(db);
+
+  const dev = devices.find((d: any) => d.deviceId === deviceId);
+  if (dev) {
+    dev.status = status;
+    writeDB(db);
+  }
+  res.json({ success: true, devices });
+});
+
+// Admin API to completely remove a device profile
+app.post("/api/devices/delete", (req, res) => {
+  const { deviceId } = req.body;
+  if (!deviceId) return res.status(400).json({ error: "ডিভাইস আইডি মিসিং।" });
+
+  const db = readDB();
+  const { devices } = getDeviceListAndKeys(db);
+
+  const idx = devices.findIndex((d: any) => d.deviceId === deviceId);
+  if (idx !== -1) {
+    devices.splice(idx, 1);
+    writeDB(db);
+  }
+  res.json({ success: true, devices });
+});
+
 // API: Process deposit (Cash In)
 app.post("/api/user/deposit", (req, res) => {
   const { phone, amount, method } = req.body;
