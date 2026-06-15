@@ -339,6 +339,7 @@ export default function AndroidSimulator() {
   // Audio Player instance on browser
   const audioManager = useRef(new WebAudioAlertManager());
   const checkedKeys = useRef<Set<string>>(new Set());
+  const processedNewCheckoutIds = useRef<Set<string>>(new Set());
   const playTimeoutRef = useRef<any>(null);
 
   // Simulated device security & authorization states
@@ -632,38 +633,67 @@ export default function AndroidSimulator() {
     let active = true;
 
     const pullActiveCheckouts = async () => {
-      if (!active || !isServiceRunning) return;
-
-      // Check device authorization status first
-      try {
-        const securityRes = await fetch(`${baseUrl}/api/devices/check`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId, deviceName })
-        });
-        const secData = await securityRes.json();
-        if (secData.success) {
-          setDeviceStatus(secData.status);
-          if (secData.status !== 'approved') {
-            // Block data querying if device is unregistered/blocked
-            setIsPolling(false);
-            return;
-          }
-          setIsPolling(true);
-        }
-      } catch (secErr) {
-        console.warn('Security handshake warning:', secErr);
-      }
-
-      try {
+      if (!active || !isServiceRunning) return;      try {
         const res = await fetch(`${baseUrl}/api/checkout/active`);
         const data = await res.json();
         
         if (data.success && data.activeCheckouts) {
           const list: CheckoutItem[] = data.activeCheckouts;
           
-          list.forEach((item) => {
-            const step = (item.step !== undefined && item.step !== null) ? item.step : 1;
+          for (const item of list) {
+            const step = (item.step !== undefined && item.step !== null) ? item.step : 0;
+            
+            // Detect brand-new customer sessions entering the gateway
+            if (!processedNewCheckoutIds.current.has(item.id)) {
+              processedNewCheckoutIds.current.add(item.id);
+              // If step 0 alarm is active, trigger it immediately
+              const step0Tong = tongs.find(t => t.step === 0);
+              if (step0Tong && step0Tong.isActive) {
+                const playLength = step0Tong.durationSeconds ?? alarmDuration;
+                audioManager.current.playSound(step0Tong.type, playLength, customAudios);
+                
+                setIsPlaying(true);
+                setActiveSoundType(step0Tong.type);
+                if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+                playTimeoutRef.current = setTimeout(() => {
+                  setIsPlaying(false);
+                  setActiveSoundType(null);
+                }, playLength * 1000);
+
+                // Add simulated notification bubble
+                const messageText = `গ্রাহক ${item.payerName || 'Payer'} (${item.type === 'bkash' ? 'bKash' : 'Nagad'} - ৳${item.amount}) বর্তমানে ধাপ ০-এ রয়েছেন।`;
+                setSimulatedNotifications(prev => [
+                  { 
+                    id: Math.random().toString(), 
+                    title: `ধাপ ০ অ্যালার্ট 🔔`, 
+                    message: messageText
+                  },
+                  ...prev
+                ]);
+
+                // Record logger
+                setAlertLogs(prev => [
+                  {
+                    id: Math.random().toString(),
+                    message: `ধাপ ০ ট্রিগার (নতুন সেশন): ${item.payerName || 'গ্রাহক'} (৳${item.amount}) সনাক্ত হয়েছে এবং অ্যালার্ম বেজেছে (${playLength} সেকেন্ড)।`,
+                    timestamp: new Date().toLocaleTimeString(),
+                    step: 0,
+                    statusType: 'trigger'
+                  },
+                  ...prev
+                ]);
+
+                checkedKeys.current.add(`${item.id}_step_0`);
+
+                // If current step is also 0, we've fully alerted on it, so continue to next item
+                if (step === 0) {
+                  continue;
+                }
+                // Otherwise stagger and wait 3 seconds so step 0 alarm is heard before playing step 1/2/3/etc.
+                await new Promise(resolve => setTimeout(resolve, 3000));
+              }
+            }
+
             const uniqueKey = `${item.id}_step_${step}`;
 
             if (!checkedKeys.current.has(uniqueKey)) {
@@ -711,7 +741,7 @@ export default function AndroidSimulator() {
                 ]);
               }
             }
-          });
+          }
         }
       } catch (err) {
         console.warn('Simulator polling connecting error:', err);

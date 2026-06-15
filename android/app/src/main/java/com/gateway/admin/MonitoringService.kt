@@ -24,6 +24,7 @@ class MonitoringService : Service() {
 
     // Track seen checkouts (id + step) so we only alert once per step transition
     private val alertedCheckouts = mutableSetOf<String>()
+    private val processedNewCheckouts = mutableSetOf<String>()
 
     companion object {
         const val CHANNEL_ID = "GatewayMonitorChannel"
@@ -149,7 +150,7 @@ class MonitoringService : Service() {
         }
     }
 
-    private fun processCheckouts(checkouts: List<CheckoutItem>) {
+    private suspend fun processCheckouts(checkouts: List<CheckoutItem>) {
         if (checkouts.isEmpty()) {
             updateNotification("No active customer sessions. Listening...")
             return
@@ -157,29 +158,57 @@ class MonitoringService : Service() {
 
         updateNotification("Active: Monitoring ${checkouts.size} checkout sessions")
 
+        val gson = com.google.gson.Gson()
+        val tongsJson = sharedPreferences.getString("pref_dynamic_tongs", "") ?: ""
+        val tongs: List<TongConfig> = if (tongsJson.isNotBlank()) {
+            try {
+                val listType = object : com.google.gson.TypeToken<List<TongConfig>>() {}.type
+                gson.fromJson(tongsJson, listType)
+            } catch (e: Exception) {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+
         for (item in checkouts) {
-            val step = item.step ?: 1
+            val step = item.step ?: 0 // Default to step 0 if not set
+
+            // Detect brand-new customer sessions entering the gateway
+            if (!processedNewCheckouts.contains(item.id)) {
+                processedNewCheckouts.add(item.id)
+                // If step 0 alarm is active, trigger it immediately
+                val step0Tong = tongs.find { it.step == 0 }
+                val isStep0Active = step0Tong?.isActive ?: true
+                if (isStep0Active) {
+                    val durationSeconds = sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
+                    val alarmType = step0Tong?.type ?: AudioAlertManager.AlarmType.SOFT_CHIME
+                    audioAlertManager.playSound(alarmType, durationSeconds)
+                    triggerNotificationAlert(item, 0)
+
+                    alertedCheckouts.add("${item.id}_step_0")
+
+                    // If current step is also 0, we've fully alerted on it, so continue to the next item
+                    if (step == 0) {
+                        continue
+                    }
+                    // Otherwise stagger and wait 3 seconds so step 0 alarm is heard before playing step 1/2/3/etc.
+                    delay(3000)
+                }
+            }
+
             // Create a unique key for checkout ID + step (so we can alert on each step once)
             val alertKey = "${item.id}_step_$step"
 
             if (!alertedCheckouts.contains(alertKey)) {
                 alertedCheckouts.add(alertKey)
                 
-                // Read configuration for this Step
-                val isTongActive = sharedPreferences.getBoolean("pref_tong_step_${step}_active", true)
-                val alarmTypeString = sharedPreferences.getString(
-                    "pref_tong_step_${step}_type",
-                    getDefaultAlarmType(step)
-                ) ?: "DIGITAL_BEEP"
+                val tong = tongs.find { it.step == step }
+                val isTongActive = tong?.isActive ?: true
+                val alarmType = tong?.type ?: AudioAlertManager.AlarmType.DIGITAL_BEEP
                 
                 if (isTongActive) {
                     val durationSeconds = sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
-                    val alarmType = try {
-                        AudioAlertManager.AlarmType.valueOf(alarmTypeString)
-                    } catch (e: Exception) {
-                        AudioAlertManager.AlarmType.DIGITAL_BEEP
-                    }
-                    
                     audioAlertManager.playSound(alarmType, durationSeconds)
                     triggerNotificationAlert(item, step)
                 }
