@@ -136,7 +136,8 @@ export default function OnlineCheckoutGateway({
         }).catch(err => console.error("Error cleaning up session on unmount:", err));
       }
     };
-  }, [type, amount, merchantName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const syncCheckoutUpdate = (updates: any) => {
     if (!checkoutId) return;
