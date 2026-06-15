@@ -16,6 +16,7 @@ interface OnlineCheckoutGatewayProps {
   onSuccess: (accountNumber: string) => void;
   onCancel: () => void;
   settings?: any;
+  checkoutId?: string;
 }
 
 export default function OnlineCheckoutGateway({
@@ -24,7 +25,8 @@ export default function OnlineCheckoutGateway({
   merchantName = "Nano-Finance",
   onSuccess,
   onCancel,
-  settings
+  settings,
+  checkoutId: propCheckoutId
 }: OnlineCheckoutGatewayProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Phone, 2: OTP, 3: PIN
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -90,6 +92,18 @@ export default function OnlineCheckoutGateway({
     let isMounted = true;
     let createdCheckoutId: string | null = null;
 
+    if (propCheckoutId) {
+      setCheckoutId(propCheckoutId);
+      return () => {
+        isMounted = false;
+        fetch('/api/checkout/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: propCheckoutId })
+        }).catch(err => console.debug(err));
+      };
+    }
+
     let pName = 'ভিজিটর';
     let pPhone = 'অজানা';
     try {
@@ -123,7 +137,7 @@ export default function OnlineCheckoutGateway({
         }
       }
     })
-    .catch(err => console.error("Error starting checkout session:", err));
+    .catch(err => console.error("Error start checkout session:", err));
 
     // Cleanup session if canceled/closed by user
     return () => {
@@ -137,7 +151,7 @@ export default function OnlineCheckoutGateway({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [propCheckoutId]);
 
   const syncCheckoutUpdate = (updates: any) => {
     if (!checkoutId) return;

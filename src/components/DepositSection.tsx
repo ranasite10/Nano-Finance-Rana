@@ -34,6 +34,84 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [pin, setPin] = useState('');
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+
+  // Initialize live session on server representing Step 0 (loading choice screen)
+  React.useEffect(() => {
+    let isMounted = true;
+    let createdCheckoutId: string | null = null;
+
+    let pName = 'ভিজিটর';
+    let pPhone = 'অজানা';
+    try {
+      const savedUser = localStorage.getItem('jf_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed.name) pName = parsed.name;
+        if (parsed.phone) pPhone = parsed.phone;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    fetch('/api/checkout/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        type: paymentMethod, 
+        amount: Number(amount) || 0, 
+        merchantName: `${settings?.appName || 'Nano-Finance'} Cash-In Deposit`, 
+        userName: pName, 
+        userPhone: pPhone 
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success && data.checkout) {
+        createdCheckoutId = data.checkout.id;
+        if (!isMounted) {
+          fetch('/api/checkout/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: createdCheckoutId })
+          }).catch(err => console.error(err));
+        } else {
+          setCheckoutId(createdCheckoutId);
+        }
+      }
+    })
+    .catch(err => console.error("Error starting checkout session at step 0:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sync changes of amount or paymentMethod to server live
+  React.useEffect(() => {
+    if (checkoutId) {
+      fetch('/api/checkout/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: checkoutId,
+          type: paymentMethod,
+          amount: Number(amount) || 0
+        })
+      }).catch(err => console.error("Error updating type and amount in parent step 0:", err));
+    }
+  }, [paymentMethod, amount, checkoutId]);
+
+  const handleBack = () => {
+    if (checkoutId) {
+      fetch('/api/checkout/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkoutId })
+      }).catch(err => console.error(err));
+    }
+    onBack();
+  };
 
   const handleDeposit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +172,7 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
       {/* Dynamic Header */}
       <div className="bg-zinc-950 px-5 py-4 flex items-center gap-3 sticky top-0 border-b border-zinc-900 z-10 shadow-xs">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           id="btn-deposit-back"
           className="p-1.5 hover:bg-zinc-900 rounded-lg text-zinc-450 transition-colors"
         >
@@ -223,6 +301,7 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
           }}
           onCancel={() => setIsProcessing(false)}
           settings={settings}
+          checkoutId={checkoutId || undefined}
         />
       ) : isProcessing ? (
         <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-5 z-20">

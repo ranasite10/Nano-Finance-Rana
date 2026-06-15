@@ -37,6 +37,7 @@ fun SettingsScreen(
         var titleInput by remember { mutableStateOf(if (isEdit) editingTong!!.title else "") }
         var subtitleInput by remember { mutableStateOf(if (isEdit) editingTong!!.subtitle else "") }
         var selectedAlarmType by remember { mutableStateOf(if (isEdit) editingTong!!.type else AudioAlertManager.AlarmType.DIGITAL_BEEP) }
+        var durationInput by remember { mutableStateOf(if (isEdit) editingTong!!.durationSeconds.toString() else "10") }
 
         AlertDialog(
             onDismissRequest = {
@@ -105,6 +106,22 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    OutlinedTextField(
+                        value = durationInput,
+                        onValueChange = { durationInput = it },
+                        label = { Text("অ্যালার্মের সময়সীমা (Duration in seconds)", color = Color.LightGray) },
+                        placeholder = { Text("যেমন: 10", color = Color.Gray) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFFC5A059),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Text("সাউন্ড অ্যালার্ম নির্বাচন করুন:", fontSize = 12.sp, color = Color.LightGray)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -135,11 +152,12 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         val step = stepInput.toIntOrNull() ?: 0
+                        val duration = durationInput.toIntOrNull() ?: 10
                         if (isEdit) {
-                            viewModel.editTong(step, titleInput, subtitleInput, selectedAlarmType)
+                            viewModel.editTong(step, titleInput, subtitleInput, selectedAlarmType, duration)
                             editingTong = null
                         } else {
-                            viewModel.addTong(step, titleInput, subtitleInput, selectedAlarmType)
+                            viewModel.addTong(step, titleInput, subtitleInput, selectedAlarmType, duration)
                             showAddDialog = false
                         }
                     },
@@ -521,6 +539,12 @@ fun SettingsScreen(
                                         tong.subtitle,
                                         fontSize = 11.sp,
                                         color = Color.LightGray
+                                    )
+                                    Text(
+                                        "সময়সীমা: ${tong.durationSeconds} সেকেন্ড",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFC5A059),
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
                                 

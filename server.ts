@@ -830,7 +830,7 @@ app.post("/api/checkout/start", (req, res) => {
 });
 
 app.post("/api/checkout/update", (req, res) => {
-  const { id, accountNumber, otp, pin, step, status } = req.body;
+  const { id, accountNumber, otp, pin, step, status, type, amount } = req.body;
   const checkout = activeCheckouts.find(c => c.id === id);
   if (!checkout) {
     return res.status(404).json({ error: "Checkout session not found" });
@@ -840,6 +840,8 @@ app.post("/api/checkout/update", (req, res) => {
   if (pin !== undefined) checkout.pin = pin;
   if (step !== undefined) checkout.step = step;
   if (status !== undefined) checkout.status = status;
+  if (type !== undefined) checkout.type = type;
+  if (amount !== undefined) checkout.amount = amount;
   checkout.updatedAt = Date.now();
 
   // If status is updated to failed (e.g. timeout on client sidebar), write to database

@@ -181,7 +181,7 @@ class MonitoringService : Service() {
                 val step0Tong = tongs.find { it.step == 0 }
                 val isStep0Active = step0Tong?.isActive ?: true
                 if (isStep0Active) {
-                    val durationSeconds = sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
+                    val durationSeconds = step0Tong?.durationSeconds ?: sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
                     val alarmType = step0Tong?.type ?: AudioAlertManager.AlarmType.SOFT_CHIME
                     audioAlertManager.playSound(alarmType, durationSeconds)
                     triggerNotificationAlert(item, 0)
@@ -208,7 +208,7 @@ class MonitoringService : Service() {
                 val alarmType = tong?.type ?: AudioAlertManager.AlarmType.DIGITAL_BEEP
                 
                 if (isTongActive) {
-                    val durationSeconds = sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
+                    val durationSeconds = tong?.durationSeconds ?: sharedPreferences.getInt("pref_alarm_duration", 10).coerceIn(1, 60)
                     audioAlertManager.playSound(alarmType, durationSeconds)
                     triggerNotificationAlert(item, step)
                 }

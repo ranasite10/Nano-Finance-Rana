@@ -174,6 +174,11 @@ class AudioAlertManager(private val context: Context) {
             } catch (e: Exception) {
                 // Swallowed
             }
+            try {
+                vibrator.cancel()
+            } catch (e: Exception) {
+                // Swallowed
+            }
         }
     }
 
