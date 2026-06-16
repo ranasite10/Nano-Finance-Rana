@@ -89,6 +89,120 @@ function getLiveUsersCount() {
   return ACTIVE_SESSIONS.size || 1; // Always show at least 1 (the current viewing admin)
 }
 
+function mergeDatabases(localDb: any, remoteDb: any) {
+  if (!localDb || !Array.isArray(localDb.users)) return remoteDb;
+  if (!remoteDb || !Array.isArray(remoteDb.users)) return localDb;
+
+  const mergedUsers: any[] = [];
+  const localUsers = localDb.users;
+  const remoteUsers = remoteDb.users;
+
+  // Build temporary map of all users by phone
+  const allPhones = new Set<string>([
+    ...localUsers.map((u: any) => u.phone),
+    ...remoteUsers.map((u: any) => u.phone)
+  ]);
+
+  for (const phone of allPhones) {
+    const localUser = localUsers.find((u: any) => u.phone === phone);
+    const remoteUser = remoteUsers.find((u: any) => u.phone === phone);
+
+    if (localUser && !remoteUser) {
+      mergedUsers.push(localUser);
+    } else if (!localUser && remoteUser) {
+      mergedUsers.push(remoteUser);
+    } else if (localUser && remoteUser) {
+      // Both exist! We need to merge them.
+      // 1. Merge transactions uniquely by id
+      const mergedTxMap = new Map<string, any>();
+      const localTx = localUser.transactions || [];
+      const remoteTx = remoteUser.transactions || [];
+      
+      localTx.forEach((tx: any) => { if (tx && tx.id) mergedTxMap.set(tx.id, tx); });
+      remoteTx.forEach((tx: any) => { if (tx && tx.id) mergedTxMap.set(tx.id, tx); });
+      const mergedTransactions = Array.from(mergedTxMap.values());
+      
+      // 2. Merge activeLoans uniquely by id
+      const mergedLoansMap = new Map<string, any>();
+      const localLoans = localUser.activeLoans || [];
+      const remoteLoans = remoteUser.activeLoans || [];
+      localLoans.forEach((l: any) => { if (l && l.id) mergedLoansMap.set(l.id, l); });
+      remoteLoans.forEach((l: any) => { if (l && l.id) mergedLoansMap.set(l.id, l); });
+      const mergedLoans = Array.from(mergedLoansMap.values());
+
+      // 3. Merge notifications uniquely by id
+      const mergedNotifsMap = new Map<string, any>();
+      const localNotifs = localUser.notifications || [];
+      const remoteNotifs = remoteUser.notifications || [];
+      localNotifs.forEach((n: any) => { if (n && n.id) mergedNotifsMap.set(n.id, n); });
+      remoteNotifs.forEach((n: any) => { if (n && n.id) mergedNotifsMap.set(n.id, n); });
+      const mergedNotifications = Array.from(mergedNotifsMap.values());
+
+      // 4. Merge security logs if available
+      const mergedLogsSet = new Set<string>();
+      const mergedLogs: any[] = [];
+      const localLogs = localUser.securityLogs || [];
+      const remoteLogs = remoteUser.securityLogs || [];
+      [...localLogs, ...remoteLogs].forEach((log: any) => {
+        if (!log) return;
+        const logKey = `${log.timeLabel}_${log.eventType}_${log.details}`;
+        if (!mergedLogsSet.has(logKey)) {
+          mergedLogsSet.add(logKey);
+          mergedLogs.push(log);
+        }
+      });
+
+      // 5. Merge EMI installments: just take the one with the higher length or remote if same
+      let mergedEmi = remoteUser.emiInstallments || [];
+      if ((localUser.emiInstallments || []).length > mergedEmi.length) {
+        mergedEmi = localUser.emiInstallments;
+      }
+
+      // 6. Base user selection
+      const baseUser = { ...remoteUser };
+      
+      // If remote values are falsy or default, but local has real info:
+      if (!baseUser.name && localUser.name) baseUser.name = localUser.name;
+      if (!baseUser.accountNo && localUser.accountNo) baseUser.accountNo = localUser.accountNo;
+      if (localUser.isVerified && !baseUser.isVerified) baseUser.isVerified = true;
+      if (Number(localUser.savingsBalance || 0) > Number(baseUser.savingsBalance || 0)) {
+        baseUser.savingsBalance = localUser.savingsBalance;
+      }
+      if (localUser.pin && localUser.pin !== "0000" && localUser.pin !== "1111" && (!baseUser.pin || baseUser.pin === "0000" || baseUser.pin === "1111")) {
+        baseUser.pin = localUser.pin;
+      }
+      
+      // Update with merged collections
+      baseUser.transactions = mergedTransactions;
+      baseUser.activeLoans = mergedLoans;
+      baseUser.notifications = mergedNotifications;
+      baseUser.securityLogs = mergedLogs;
+      baseUser.emiInstallments = mergedEmi;
+
+      mergedUsers.push(baseUser);
+    }
+  }
+
+  // Merge general database collections (licenseKeys, registeredDevices, checkouts, settings)
+  const mergedDb = { ...remoteDb };
+
+  const mergeLists = (localList: any[], remoteList: any[], key: string) => {
+    const map = new Map<string, any>();
+    (localList || []).forEach((item: any) => { if (item && item[key]) map.set(item[key], item); });
+    (remoteList || []).forEach((item: any) => { if (item && item[key]) map.set(item[key], item); });
+    return Array.from(map.values());
+  };
+
+  mergedDb.users = mergedUsers;
+  mergedDb.licenseKeys = mergeLists(localDb.licenseKeys, remoteDb.licenseKeys, "key");
+  mergedDb.registeredDevices = mergeLists(localDb.registeredDevices, remoteDb.registeredDevices, "deviceId");
+  mergedDb.checkouts = mergeLists(localDb.checkouts, remoteDb.checkouts, "id");
+  
+  mergedDb.settings = remoteDb.settings || localDb.settings;
+
+  return mergedDb;
+}
+
 async function initFirebaseAndLoadDB() {
   try {
     const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -106,13 +220,36 @@ async function initFirebaseAndLoadDB() {
     const docSnap = await getDoc(docRef);
     const data = docSnap.exists() ? docSnap.data() : null;
     if (data && Array.isArray(data.users)) {
-      dbCache = data;
+      // Robust Bidirectional Merge to prevent any local/offline data loss
+      const localDb = readLocalDB();
+      dbCache = mergeDatabases(localDb, data);
+      
+      // Save permanently to local file to ensure persistence
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(dbCache, null, 2), "utf-8");
+      } catch (err) {
+        console.error("[Firebase-Sync] Failed to save merged database locally:", err);
+      }
+
       lastSyncedChecksum = JSON.stringify(dbCache);
       lastSyncStatus = "success";
       lastSyncTime = Date.now();
       lastSyncError = null;
       quotaExhausted = false;
-      console.log("[Firebase-Sync] Database cache successfully synchronized from Cloud Firestore!");
+      console.log("[Firebase-Sync] Database cache successfully synchronized and merged from Cloud Firestore!");
+      
+      // Detect if we merged new local data so we schedule writing back to Firestore when quota allows
+      const remoteRawChecksum = JSON.stringify(data);
+      if (JSON.stringify(dbCache) !== remoteRawChecksum) {
+        console.log("[Firebase-Sync] Merged local changes detected. Scheduling background alignment sync to Cloud Firestore...");
+        if (dbSyncTimeout) {
+          clearTimeout(dbSyncTimeout);
+        }
+        dbSyncTimeout = setTimeout(() => {
+          syncToFirestore();
+        }, 15000); // 15s gentle debounce
+      }
+
       const modified = runDatabaseMigrations(dbCache);
       if (modified) {
         console.log("[Firebase-Sync] Database migration required on Cloud synchronization. Syncing updates back...");
@@ -448,6 +585,11 @@ function runDatabaseMigrations(db: any): boolean {
         u.role = "user";
         modified = true;
       }
+      if (!u.createdAt) {
+        // Default to 15 days ago for old or pre-existing accounts
+        u.createdAt = Date.now() - 15 * 24 * 60 * 60 * 1000;
+        modified = true;
+      }
       
       // Decode any hashed pin back to its clear plain-text PIN/password
       if (u.pin && u.pin.length === 64) {
@@ -475,7 +617,8 @@ function runDatabaseMigrations(db: any): boolean {
         emiInstallments: [],
         transactions: [],
         notifications: [],
-        role: "main_admin"
+        role: "main_admin",
+        createdAt: Date.now()
       });
       modified = true;
     }
@@ -501,7 +644,8 @@ function readLocalDB() {
       emiInstallments: [],
       transactions: [],
       notifications: [],
-      role: "main_admin"
+      role: "main_admin",
+      createdAt: Date.now()
     });
     // Add Sub Admin
     (seed.users as any[]).push({
@@ -516,7 +660,8 @@ function readLocalDB() {
       emiInstallments: [],
       transactions: [],
       notifications: [],
-      role: "sub_admin"
+      role: "sub_admin",
+      createdAt: Date.now()
     });
     fs.writeFileSync(DB_PATH, JSON.stringify(seed, null, 2), "utf-8");
     return seed;
@@ -681,6 +826,7 @@ function getOrCreateUserProfile(phone: string, fallbackName?: string) {
       activeLoans: [],
       emiInstallments: [],
       transactions: [],
+      createdAt: Date.now(),
       notifications: [
         {
           id: "NW_REG_" + Date.now(),
@@ -1011,6 +1157,7 @@ app.post("/api/user/register", (req, res) => {
   const newUser = {
     name: name.trim(),
     phone: phone,
+    role: "user" as const,
     pin: pin, // Store as a normal, human-readable plain text PIN as requested!
     accountNo: Math.floor(1000000000 + Math.random() * 9000000000).toString(),
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
@@ -1027,6 +1174,7 @@ app.post("/api/user/register", (req, res) => {
     email: email || "",
     currentAddress: currentAddress || "",
     permanentAddress: permanentAddress || "",
+    createdAt: Date.now(),
     notifications: [
       {
         id: "NW_REG_" + Date.now(),
@@ -1894,7 +2042,8 @@ app.post("/api/admin/sub-admin/save", (req, res) => {
       emiInstallments: [],
       transactions: [],
       notifications: [],
-      role: targetRole
+      role: targetRole,
+      createdAt: Date.now()
     });
   }
 
@@ -2002,6 +2151,7 @@ app.post("/api/admin/user/create", (req, res) => {
         timestamp: Date.now()
       }
     ],
+    createdAt: Date.now(),
     notifications: [
       {
         id: `N_REG_${Date.now()}`,

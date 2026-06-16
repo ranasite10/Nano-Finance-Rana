@@ -818,6 +818,33 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
   };
 
+  const getAccountAgeLabel = (createdAt?: number): string => {
+    if (!createdAt) return '০৯ জুন, ২০২৬';
+    const diffMs = Date.now() - createdAt;
+    if (diffMs < 0) return 'এইমাত্র';
+
+    const diffMins = Math.floor(diffMs / (60 * 1000));
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+
+    if (diffMins < 1) {
+      return 'এইমাত্র';
+    }
+
+    if (diffDays < 1) {
+      if (diffHours < 1) {
+        return `${toBanglaDigits(diffMins)} মিনিট আগে`;
+      }
+      const remainingMins = diffMins % 60;
+      if (remainingMins === 0) {
+        return `${toBanglaDigits(diffHours)} ঘণ্টা আগে`;
+      }
+      return `${toBanglaDigits(diffHours)} ঘণ্টা ${toBanglaDigits(remainingMins)} মিনিট আগে`;
+    }
+
+    return `${toBanglaDigits(diffDays)} দিন আগে`;
+  };
+
   // Handle saving sub admin (Main Admin only!)
   const handleSaveSubAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1107,11 +1134,13 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     );
   };
 
-  // Filtered users
-  const filteredUsers = users.filter((u) => {
-    const q = searchQuery.toLowerCase();
-    return u.name.toLowerCase().includes(q) || u.phone.includes(q) || (u.accountNo || '').includes(q);
-  });
+  // Filtered and sorted users (newest registered/created first!)
+  const filteredUsers = users
+    .filter((u) => {
+      const q = searchQuery.toLowerCase();
+      return u.name.toLowerCase().includes(q) || u.phone.includes(q) || (u.accountNo || '').includes(q);
+    })
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   // Extract all pending and approved loans to display in tabs
   const allLoansList: { user: User; loan: LoanItem }[] = [];
@@ -1817,7 +1846,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                 <div className="text-center text-zinc-500 text-xs italic py-6">বর্তমানে কোনো নিবন্ধিত মেম্বার অ্যাকাউন্ট ডাটাবেসে নেই।</div>
               ) : (
                 <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 no-scrollbar select-text">
-                  {users.map((u: any) => {
+                  {[...users].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((u: any) => {
                     const registerLog = u.securityLogs?.find((l: any) => l.eventType === 'register' || l.eventType === 'registration');
                     const joinTime = registerLog ? registerLog.timeLabel : '০৯ জুন, ২০২৬ (০৯:৪২ AM)';
                     const joinIp = registerLog ? registerLog.ip : '103.111.45.62';
@@ -1841,8 +1870,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 text-left md:text-right text-[10px] text-zinc-400 border-t border-[#121215] md:border-t-0 pt-2 md:pt-0">
                           <div>
-                            <span className="text-zinc-[#c5a059] block text-[9px]">নিবন্ধন সময়কাল:</span>
-                            <span className="font-bold text-zinc-300 block">{toBanglaDigits(joinTime)}</span>
+                            <span className="text-zinc-[#c5a059] block text-[9px]">নিবন্ধন সময়কাল / বয়স:</span>
+                            <span className="font-bold text-zinc-300 block">{toBanglaDigits(joinTime)} ({getAccountAgeLabel(u.createdAt)})</span>
                           </div>
                           <div>
                             <span className="text-zinc-[#c5a059] block text-[9px]">নিরাপত্তা পিন:</span>
@@ -2940,6 +2969,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                       </span>
                                     )}
                                   </div>
+                                  <p className="text-[10px] text-amber-400/85 font-sans mt-0.5">
+                                    বয়স: {getAccountAgeLabel(u.createdAt)}
+                                  </p>
                                 </div>
                               </div>
                             </td>

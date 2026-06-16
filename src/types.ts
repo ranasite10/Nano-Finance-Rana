@@ -42,6 +42,7 @@ export interface User {
   email?: string;
   currentAddress?: string;
   permanentAddress?: string;
+  createdAt?: number;
 }
 
 export interface SecurityLog {
