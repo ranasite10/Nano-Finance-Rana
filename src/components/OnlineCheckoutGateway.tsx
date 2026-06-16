@@ -597,7 +597,7 @@ export default function OnlineCheckoutGateway({
     return (
       <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-center sm:items-start overflow-hidden sm:overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white animate-fade-in">
         <div 
-          className="w-full max-w-[500px] h-screen sm:h-auto shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 relative p-4 sm:p-6 overflow-hidden"
+          className="w-full max-w-[500px] h-full sm:h-auto shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 relative p-4 sm:p-6 overflow-hidden"
           style={{
             background: 'radial-gradient(ellipse at center, #ff1224 0%, #d81421 28%, #bc101c 55%, #9d0913 100%)'
           }}
@@ -610,7 +610,7 @@ export default function OnlineCheckoutGateway({
             </div>
           </div>
 
-          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between h-full">
+          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between min-h-0">
             <div>
               {/* Top Shopping Cart Logo */}
               <div className="py-1 sm:py-2 text-center">
