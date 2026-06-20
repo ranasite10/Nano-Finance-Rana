@@ -1615,32 +1615,7 @@ app.post("/api/user/withdraw", (req, res) => {
 // Helper to save Base64 data URLs to local file uploads
 function saveBase64Image(base64Str: string | undefined | null, prefix: string): string {
   if (!base64Str) return "";
-  if (!base64Str.startsWith("data:")) return base64Str; // if it's already an URL, keep as is
-
-  try {
-    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return base64Str;
-    }
-
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, "base64");
-
-    let ext = "png";
-    if (mimeType.includes("pdf")) ext = "pdf";
-    else if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
-    else if (mimeType.includes("webp")) ext = "webp";
-
-    const fileName = `${prefix}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}.${ext}`;
-    const filePath = path.join(process.cwd(), "uploads", fileName);
-
-    fs.writeFileSync(filePath, buffer);
-    return `/uploads/${fileName}`;
-  } catch (err) {
-    console.error("Error saving base64 uploaded file:", err);
-    return base64Str;
-  }
+  return base64Str; // Simply return the Base64 Data URL to save it persistently in db.json (bypassing ephemeral disk writes)
 }
 
 // API: Apply for a Micro-Loan

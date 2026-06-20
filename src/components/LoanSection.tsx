@@ -244,20 +244,29 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
         return updated;
       });
     } catch (err) {
-      console.error('File compression to base64 error, using standard file object url fallback:', err);
-      const objectUrl = URL.createObjectURL(file);
-      setForm((prev) => {
-        const updated = {
-          ...prev,
-          [field]: file,
-          [`${field}Url`]: objectUrl,
-        };
-        if (field === 'addressProof') {
-          updated.incomeProof = file;
-          updated.incomeProofUrl = objectUrl;
-        }
-        return updated;
-      });
+      console.error('File compression to base64 error, using standard file reader base64 fallback:', err);
+      try {
+        const rawBase64 = await new Promise<string>((resolve, reject) => {
+          const fallbackReader = new FileReader();
+          fallbackReader.onload = () => resolve(fallbackReader.result as string);
+          fallbackReader.onerror = (e) => reject(e);
+          fallbackReader.readAsDataURL(file);
+        });
+        setForm((prev) => {
+          const updated = {
+            ...prev,
+            [field]: file,
+            [`${field}Url`]: rawBase64,
+          };
+          if (field === 'addressProof') {
+            updated.incomeProof = file;
+            updated.incomeProofUrl = rawBase64;
+          }
+          return updated;
+        });
+      } catch (fallbackErr) {
+        console.error('Completely failed to read file as base64:', fallbackErr);
+      }
     } finally {
       setUploadingFields((prev) => ({ ...prev, [field]: false }));
     }
