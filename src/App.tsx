@@ -476,8 +476,49 @@ export default function App() {
     localStorage.removeItem('jf_loans');
     localStorage.removeItem('jf_emi_schedule');
     localStorage.removeItem('jf_notifs');
+    localStorage.removeItem('jf_last_activity');
     setActiveScreen('login');
   };
+
+  // User auto-logout after 1 hour of inactivity
+  useEffect(() => {
+    if (!user.isLoggedIn) return;
+
+    // Set initial last activity time when logged in
+    if (!localStorage.getItem('jf_last_activity')) {
+      localStorage.setItem('jf_last_activity', Date.now().toString());
+    }
+
+    const resetTimer = () => {
+      localStorage.setItem('jf_last_activity', Date.now().toString());
+    };
+
+    // Events that denote activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Check every 10 seconds if idle time exceeds 1 hour (3600000 milliseconds)
+    const checkInterval = setInterval(() => {
+      const lastActivity = localStorage.getItem('jf_last_activity');
+      if (lastActivity) {
+        const diffMs = Date.now() - parseInt(lastActivity, 10);
+        if (diffMs >= 3600000) {
+          handleLogout();
+          alert('কোনো সক্রিয়তা না পাওয়ায় আপনার অ্যাকাউন্টটি স্বয়ংক্রিয়ভাবে লগআউট করা হয়েছে।');
+        }
+      }
+    }, 10000);
+
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+      clearInterval(checkInterval);
+    };
+  }, [user.isLoggedIn]);
 
   const handleDepositComplete = async (amount: number, method: PaymentMethod) => {
     try {
@@ -659,6 +700,7 @@ export default function App() {
       case 'deposit':
         return (
           <DepositSection
+            user={user}
             onBack={() => navigateTo('home')}
             onDepositComplete={handleDepositComplete}
             settings={settings}
@@ -720,6 +762,7 @@ export default function App() {
       case 'emi_schedule':
         return (
           <PaymentSection
+            user={user}
             savingsBalance={savingsBalance}
             emiInstallments={emiInstallments}
             activeLoans={activeLoans}

@@ -16,11 +16,48 @@ interface HomeSectionProps {
 }
 
 export default function HomeSection({ user, onNavigate, savingsBalance, unreadCount, settings }: HomeSectionProps) {
-  // Calculator States matching Screen 3 setup precisely
+  // Read dynamic limit configuration settings from admin customization
+  const minLoanAmount = settings?.minLoanAmount ?? 10000;
+  const maxLoanAmount = settings?.maxLoanAmount ?? 200000;
+  const rawLoanPresets = settings?.loanAmountPresets ?? "20000, 30000, 50000, 100000";
+  
+  const minLoanMonths = settings?.minLoanMonths ?? 3;
+  const maxLoanMonths = settings?.maxLoanMonths ?? 18;
+  const rawMonthPresets = settings?.loanMonthPresets ?? "3, 6, 9, 12";
+
+  // Calculator States matching Setup precisely with bounds
   const [loanAmount, setLoanAmount] = useState<number>(200000);
   const [months, setMonths] = useState<number>(12);
   const [emi, setEmi] = useState<number>(19000);
   const [totalRepay, setTotalRepay] = useState<number>(228000);
+
+  // Sync state boundaries on settings load / update
+  useEffect(() => {
+    if (loanAmount < minLoanAmount) {
+      setLoanAmount(minLoanAmount);
+    } else if (loanAmount > maxLoanAmount) {
+      setLoanAmount(maxLoanAmount);
+    }
+  }, [minLoanAmount, maxLoanAmount]);
+
+  useEffect(() => {
+    if (months < minLoanMonths) {
+      setMonths(minLoanMonths);
+    } else if (months > maxLoanMonths) {
+      setMonths(maxLoanMonths);
+    }
+  }, [minLoanMonths, maxLoanMonths]);
+
+  // Parse preset values safely
+  const loanAmountPresets = rawLoanPresets
+    .split(',')
+    .map((x: string) => parseInt(x.trim(), 10))
+    .filter((x: number) => !isNaN(x) && x >= minLoanAmount && x <= maxLoanAmount);
+
+  const loanMonthPresets = rawMonthPresets
+    .split(',')
+    .map((x: string) => parseInt(x.trim(), 10))
+    .filter((x: number) => !isNaN(x) && x >= minLoanMonths && x <= maxLoanMonths);
 
   // Proportional dynamic interest rate from website customisation settings
   const annualInterestRate = settings?.interestRate ?? 14;
@@ -33,6 +70,30 @@ export default function HomeSection({ user, onNavigate, savingsBalance, unreadCo
   const toBanglaDigits = (num: number | string) => {
     const banglaNumbers = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
+  };
+
+  const getAmountBanglaLabel = (amt: number) => {
+    if (amt === 100000) return '১ লক্ষ';
+    if (amt === 200000) return '২ লক্ষ';
+    if (amt === 300000) return '৩ লক্ষ';
+    if (amt === 150000) return '১.৫ লক্ষ';
+    if (amt >= 1000 && amt < 100000) {
+      const thousand = amt / 1000;
+      return `${toBanglaDigits(thousand)} হাজার`;
+    }
+    return toBanglaDigits(amt.toLocaleString('bn-BD'));
+  };
+
+  const getBoundaryMonthsLabel = (m: number) => {
+    if (m === 12) return '১২ মাস (১ বছর)';
+    if (m === 18) return '১৮ মাস (১.৫ বছর)';
+    if (m === 24) return '২৪ মাস (২ বছর)';
+    if (m === 36) return '৩৬ মাস (৩ বছর)';
+    if (m % 12 === 0) {
+      return `${toBanglaDigits(m)} মাস (${toBanglaDigits(m / 12)} বছর)`;
+    }
+    const yrs = (m / 12).toFixed(1);
+    return `${toBanglaDigits(m)} মাস (${toBanglaDigits(yrs)} বছর)`;
   };
 
   // Perform EMI Calculation dynamically based on proportional simple interest rate on an annual basis
@@ -221,44 +282,90 @@ export default function HomeSection({ user, onNavigate, savingsBalance, unreadCo
           <div className="flex flex-col gap-3.5">
             {/* Amount Slider */}
             <div>
-              <div className="flex justify-between items-center text-sm text-zinc-300 font-bold font-sans mb-1.5">
+              <div className="flex justify-between items-center text-sm text-zinc-300 font-bold font-sans mb-1.55">
                 <span>ঋণের পরিমাণ</span>
                 <span className="font-bold text-[#dfc187] font-mono text-sm">{formatBDT(loanAmount)}</span>
               </div>
               <input
                 type="range"
-                min={10000}
-                max={500000}
-                step={5000}
+                min={minLoanAmount}
+                max={maxLoanAmount}
+                step={minLoanAmount >= 50000 ? 10000 : 5000}
                 value={loanAmount}
                 onChange={(e) => setLoanAmount(Number(e.target.value))}
                 className="w-full h-1 bg-zinc-800 rounded appearance-none cursor-pointer accent-[#c5a059]"
               />
               <div className="flex justify-between text-[11px] text-zinc-400 font-mono mt-1">
-                <span>৳ ১০,০০০</span>
-                <span>৳ ৫,০০,০০০</span>
+                <span>৳ {toBanglaDigits(minLoanAmount.toLocaleString('bn-BD'))}</span>
+                <span>৳ {toBanglaDigits(maxLoanAmount.toLocaleString('bn-BD'))}</span>
               </div>
-            </div>
 
+              {/* Dynamic Preset Suggestions */}
+              {loanAmountPresets.length > 0 && (
+                <div 
+                  className="grid gap-2 mt-2.5"
+                  style={{ gridTemplateColumns: `repeat(${loanAmountPresets.length}, minmax(0, 1fr))` }}
+                >
+                  {loanAmountPresets.map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setLoanAmount(val)}
+                      type="button"
+                      className={`text-[10px] sm:text-[11px] py-1.5 px-1.5 rounded-lg font-sans text-center transition-all cursor-pointer truncate ${
+                        loanAmount === val 
+                          ? 'bg-[#c5a059] text-zinc-950 font-bold border border-[#c5a059] shadow-xs' 
+                          : 'bg-[#18181b] border border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      {getAmountBanglaLabel(val)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+ 
             {/* Duration Slider */}
             <div>
-              <div className="flex justify-between items-center text-sm text-zinc-300 font-bold font-sans mb-1.5">
+              <div className="flex justify-between items-center text-sm text-zinc-300 font-bold font-sans mb-1.55">
                 <span>মেয়াদ (মাস)</span>
                 <span className="font-bold text-[#dfc187] font-sans text-sm">{toBanglaDigits(months)} মাস</span>
               </div>
               <input
                 type="range"
-                min={3}
-                max={36}
+                min={minLoanMonths}
+                max={maxLoanMonths}
                 step={1}
                 value={months}
                 onChange={(e) => setMonths(Number(e.target.value))}
                 className="w-full h-1 bg-zinc-800 rounded appearance-none cursor-pointer accent-[#c5a059]"
               />
-              <div className="flex justify-between text-[11px] text-zinc-400 font-mono mt-1">
-                <span>৩ মাস</span>
-                <span>৩৬ মাস</span>
+              <div className="flex justify-between text-[11px] text-zinc-400 font-sans mt-1">
+                <span>{toBanglaDigits(minLoanMonths)} মাস</span>
+                <span>{getBoundaryMonthsLabel(maxLoanMonths)}</span>
               </div>
+ 
+              {/* Dynamic Months Preset Suggestions */}
+              {loanMonthPresets.length > 0 && (
+                <div 
+                  className="grid gap-2 mt-2.5"
+                  style={{ gridTemplateColumns: `repeat(${loanMonthPresets.length}, minmax(0, 1fr))` }}
+                >
+                  {loanMonthPresets.map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setMonths(val)}
+                      type="button"
+                      className={`text-[10px] sm:text-[11px] py-1.5 px-1.5 rounded-lg font-sans text-center transition-all cursor-pointer truncate ${
+                        months === val 
+                          ? 'bg-[#c5a059] text-zinc-950 font-bold border border-[#c5a059] shadow-xs' 
+                          : 'bg-[#18181b] border border-zinc-800/80 text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      {toBanglaDigits(val)} মাস
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Proportional Display matching LoanSection precisely */}

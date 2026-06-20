@@ -4,18 +4,20 @@
  */
 
 import React, { useState } from 'react';
-import { ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { PaymentMethod } from '../types';
+import { ArrowLeft, ShieldCheck, CheckCircle2, FileText } from 'lucide-react';
+import { PaymentMethod, User } from '../types';
 import OnlineCheckoutGateway from './OnlineCheckoutGateway';
 import { cleanNumericInput } from '../utils/digitConverter';
+import { generateSavingsReceiptPDF } from '../utils/pdfGenerator';
 
 interface DepositSectionProps {
+  user?: User;
   onBack: () => void;
   onDepositComplete: (amount: number, method: PaymentMethod) => void;
   settings?: any;
 }
 
-export default function DepositSection({ onBack, onDepositComplete, settings }: DepositSectionProps) {
+export default function DepositSection({ user, onBack, onDepositComplete, settings }: DepositSectionProps) {
   const getPresets = () => {
     if (settings?.depositPresets) {
       const parts = settings.depositPresets.split(',')
@@ -33,8 +35,17 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bkash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successTxId, setSuccessTxId] = useState('');
   const [pin, setPin] = useState('');
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isSuccess && !successTxId) {
+      setSuccessTxId(`TXD${Math.floor(45100 + Math.random() * 9500)}`);
+    } else if (!isSuccess && successTxId) {
+      setSuccessTxId('');
+    }
+  }, [isSuccess]);
 
   // Initialize live session on server representing Step 0 (loading choice screen)
   React.useEffect(() => {
@@ -147,6 +158,36 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
       setIsProcessing(false);
       setIsSuccess(true);
     }, 1000);
+  };
+
+  const handleDownloadReceipt = () => {
+    // generate dynamic date in Bengali
+    const currentDateObj = new Date();
+    const currentDay = currentDateObj.getDate();
+    const monthsBangla = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    const currentMonth = monthsBangla[currentDateObj.getMonth()];
+    const currentYear = currentDateObj.getFullYear();
+    const dateString = `${currentDay.toString().padStart(2, '0')} ${currentMonth}, ${currentYear}`;
+
+    const activeUser: User = user || {
+      name: 'সদস্য গ্রাহক',
+      phone: '01700000055',
+      accountNo: 'LA-98472901-52',
+      isLoggedIn: true,
+      isVerified: true,
+      role: 'user',
+    };
+
+    generateSavingsReceiptPDF({
+      user: activeUser,
+      amount: Number(amount),
+      paymentMethod,
+      transactionId: successTxId,
+      dateString,
+    });
   };
 
   const toBanglaDigits = (num: number | string) => {
@@ -349,45 +390,63 @@ export default function DepositSection({ onBack, onDepositComplete, settings }: 
 
       {/* Success Animation Card Block */}
       {isSuccess && (
-        <div className="absolute inset-0 bg-[#0a0a09] flex flex-col items-center justify-center p-6 z-20 text-center animate-fade-in select-none">
-          <div className="relative flex items-center justify-center w-20 h-20 bg-emerald-950/20 text-emerald-400 rounded-full animate-bounce duration-1000 border-4 border-emerald-900/30 mb-5 animate-bounce">
-            <CheckCircle2 className="w-12 h-12" />
+        <div className="absolute inset-0 bg-[#0a0a09] flex flex-col items-center justify-center p-6 z-20 text-center animate-fade-in select-none overflow-y-auto">
+          <div className="relative flex items-center justify-center w-16 h-16 bg-emerald-950/20 text-[#10b981] rounded-full border-4 border-emerald-900/30 mb-4 animate-bounce">
+            <CheckCircle2 className="w-10 h-10" />
           </div>
 
-          <h3 className="text-lg font-bold font-serif italic text-white mb-1">জমা সফল হয়েছে!</h3>
-          <p className="text-xs text-zinc-450 font-sans leading-relaxed max-w-[240px] mb-6">
-            আপনার সঞ্চয় অ্যাকাউন্টে {formatBDT(Number(amount))} সফলভাবে জমা করা হয়েছে।
+          <h3 className="text-base font-bold text-emerald-450 mb-1">সঞ্চয় সফলভাবে যুক্ত হয়েছে!</h3>
+          <p className="text-[11px] text-zinc-400 font-sans leading-relaxed max-w-[250px] mb-4">
+            আপনার সঞ্চয় অ্যাকাউন্টে {formatBDT(Number(amount))} সফলভাবে জমা অবমুক্ত করা হয়েছে।
           </p>
 
-          <div className="bg-[#111113] rounded-2xl p-4 w-full flex flex-col gap-2.5 text-left mb-6 font-sans border border-zinc-850">
+          <div className="bg-[#111113] rounded-2xl p-4 w-full flex flex-col gap-2.5 text-left mb-5 font-sans border border-emerald-900/10 relative overflow-hidden">
+            {/* Watermark-style light stamp in background */}
+            <div className="absolute -right-3 -bottom-3 text-[50px] font-black italic select-none text-emerald-900/5 rotate-12 pointer-events-none">
+              D-PAID
+            </div>
+
+            <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-zinc-850">
+              <span className="text-zinc-500 uppercase font-bold tracking-wider">রসিদ বিবরণী</span>
+              <span className="bg-emerald-950 text-emerald-400 border border-emerald-900/30 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase animate-pulse">
+                অনুমোদিত • Verified
+              </span>
+            </div>
+
             <div className="flex justify-between text-xs text-zinc-400">
               <span>লেনদেন মাধ্যম:</span>
               <span className="font-bold text-zinc-200">{getMethodNameDesc(paymentMethod)}</span>
             </div>
             <div className="flex justify-between text-xs text-zinc-400">
-              <span>পরিমাণ:</span>
-              <span className="font-bold text-[#dfc187]">{formatBDT(Number(amount))}</span>
-            </div>
-            <div className="flex justify-between text-xs text-zinc-400">
-              <span>তারিখ:</span>
-              <span className="text-zinc-200">{toBanglaDigits('০৮ জুন, ২০২৬')}</span>
+              <span>জমার পরিমাণ:</span>
+              <span className="font-extrabold text-[#dfc187] font-mono">{formatBDT(Number(amount))}</span>
             </div>
             <div className="flex justify-between text-[11px] text-zinc-550 pt-2 border-t border-zinc-850">
-              <span>লেনদেন আইডি:</span>
-              <span className="font-mono">TX{Math.floor(1000 + Math.random() * 9000)}</span>
+              <span>ট্রানজেকশন আইডি:</span>
+              <span className="font-mono text-zinc-300 font-bold select-all bg-zinc-900/60 px-1.5 py-0.5 rounded border border-zinc-800">{successTxId}</span>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              setIsSuccess(false);
-              onDepositComplete(Number(amount), paymentMethod);
-            }}
-            id="btn-deposit-ok"
-            className="w-full bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 py-3 rounded-xl font-bold font-sans text-xs transition-colors shadow-md text-center cursor-pointer"
-          >
-            ড্যাশবোর্ডে ফিরে যান
-          </button>
+          <div className="flex flex-col gap-2.5 w-full">
+            <button
+              onClick={handleDownloadReceipt}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-bold font-sans text-xs transition-colors shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer border border-emerald-500/10"
+            >
+              <FileText className="w-4 h-4" />
+              অফিশিয়াল রসিদ ডাউনলোড করুন (PDF)
+            </button>
+
+            <button
+              onClick={() => {
+                setIsSuccess(false);
+                onDepositComplete(Number(amount), paymentMethod);
+              }}
+              id="btn-deposit-ok"
+              className="w-full bg-[#1c1c1e] text-zinc-300 hover:bg-zinc-800 py-2.5 rounded-xl font-bold font-sans text-xs transition-colors border border-zinc-800 text-center cursor-pointer"
+            >
+              ড্যাশবোর্ডে ফিরে যান
+            </button>
+          </div>
         </div>
       )}
     </div>

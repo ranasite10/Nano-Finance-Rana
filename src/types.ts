@@ -80,6 +80,7 @@ export interface LoanItem {
   emiAmount: number;
   status: 'pending' | 'approved' | 'paid' | 'rejected';
   date: string;
+  createdAt?: number;
   repaidCount: number;
   totalInstallments: number;
   nidFrontUrl?: string;
@@ -103,6 +104,7 @@ export interface NotificationItem {
   title: string;
   body: string;
   timeLabel: string;
+  createdAt?: number;
   isRead: boolean;
   type: 'success' | 'warn' | 'info' | 'loan';
 }

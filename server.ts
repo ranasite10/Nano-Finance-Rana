@@ -12,6 +12,13 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
+// Ensure uploads folder exists and serve it statically
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR));
+
 // Global CORS Middleware - allows simulator or tools from any origin to poll safely
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -77,6 +84,31 @@ function getActiveSessionsList(allDbUsers: any[]) {
   }
   
   return list;
+}
+
+function getCurrentBanglaDateString(): string {
+  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const banglaMonths = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+  const date = new Date();
+  const day = date.getDate();
+  const monthIndex = date.getMonth();
+  const year = date.getFullYear();
+
+  const toBnDigits = (num: number) => {
+    return num.toString().split('').map(digit => {
+      const idx = parseInt(digit, 10);
+      return !isNaN(idx) ? banglaDigits[idx] : digit;
+    }).join('');
+  };
+
+  const dayBn = toBnDigits(day);
+  const monthBn = banglaMonths[monthIndex];
+  const yearBn = toBnDigits(year);
+
+  return `${dayBn} ${monthBn}, ${yearBn}`;
 }
 
 function getLiveUsersCount() {
@@ -518,7 +550,13 @@ const DEFAULT_SETTINGS = {
   bkashLogo: "",
   nagadLogo: "",
   whatsappNumber: "",
-  helpCenterLogo: ""
+  helpCenterLogo: "",
+  minLoanAmount: 10000,
+  maxLoanAmount: 200000,
+  loanAmountPresets: "20000, 30000, 50000, 100000",
+  minLoanMonths: 3,
+  maxLoanMonths: 18,
+  loanMonthPresets: "3, 6, 9, 12"
 };
 
 // Helper to brute force and decode a 4-6 digit SHA-256 PIN back to plain text
@@ -574,6 +612,30 @@ function runDatabaseMigrations(db: any): boolean {
     }
     if (db.settings.helpCenterLogo === undefined) {
       db.settings.helpCenterLogo = "";
+      modified = true;
+    }
+    if (db.settings.minLoanAmount === undefined) {
+      db.settings.minLoanAmount = 10000;
+      modified = true;
+    }
+    if (db.settings.maxLoanAmount === undefined) {
+      db.settings.maxLoanAmount = 200000;
+      modified = true;
+    }
+    if (db.settings.loanAmountPresets === undefined) {
+      db.settings.loanAmountPresets = "20000, 30000, 50000, 100000";
+      modified = true;
+    }
+    if (db.settings.minLoanMonths === undefined) {
+      db.settings.minLoanMonths = 3;
+      modified = true;
+    }
+    if (db.settings.maxLoanMonths === undefined) {
+      db.settings.maxLoanMonths = 18;
+      modified = true;
+    }
+    if (db.settings.loanMonthPresets === undefined) {
+      db.settings.loanMonthPresets = "3, 6, 9, 12";
       modified = true;
     }
   }
@@ -793,7 +855,7 @@ function addSecurityLog(user: any, eventType: string, status: "success" | "faile
 
   const now = new Date();
   const formatTime = now.toLocaleTimeString("en-US", { hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const bstTime = `০৯ জুন, ২০২৬ (${formatTime})`;
+  const bstTime = `${getCurrentBanglaDateString()} (${formatTime})`;
 
   const logEntry = {
     id: `SEC_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1246,6 +1308,7 @@ app.post("/api/user/change-pin", (req, res) => {
     title: "পিন কোড পরিবর্তন সতর্কবার্তা",
     body: `আপনার ডিভাইস থেকে নিরাপত্তা পিন কোডটি সফলভাবে আপডেট করা হয়েছে। যদি আপনি এটি পরিবর্তন না করে থাকেন, তবে অবিলম্বে আমাদের হেল্পলাইন নম্বরে যোগাযোগ করুন।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "warn"
   });
@@ -1457,7 +1520,7 @@ app.post("/api/user/deposit", (req, res) => {
     type: "deposit",
     method: method || "bkash",
     amount: Number(amount),
-    date: "০৯ জুন, ২০২৬",
+    date: getCurrentBanglaDateString(),
     status: "completed",
     titleBangla: `জমা (${methodNames[method] || method})`,
     descBangla: "সঞ্চয় অ্যাকাউন্টে ক্যাশ ইন সম্পন্ন",
@@ -1470,6 +1533,7 @@ app.post("/api/user/deposit", (req, res) => {
     title: "সঞ্চয় জমা সফল (Cash In)",
     body: `আপনার সঞ্চয় অ্যাকাউন্টে সফলভাবে ৳ ${Number(amount).toLocaleString("bn-BD")} জমা সম্পন্ন হয়েছে।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "success",
   };
@@ -1515,7 +1579,7 @@ app.post("/api/user/withdraw", (req, res) => {
     type: "withdraw",
     method: method || "bank",
     amount: Number(amount),
-    date: "০৯ জুন, ২০২৬",
+    date: getCurrentBanglaDateString(),
     status: "completed",
     titleBangla: `উত্তোলন (${methodNames[method] || method})`,
     descBangla: "সফল তহবিল ক্যাশ আউট",
@@ -1528,6 +1592,7 @@ app.post("/api/user/withdraw", (req, res) => {
     title: "ফান্ড উত্তোলন সফল",
     body: `আপনার অ্যাকাউন্ট থেকে ৳ ${Number(amount).toLocaleString("bn-BD")} উত্তোলনের অনুরোধ সফলভাবে সম্পন্ন হয়েছে।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "success",
   };
@@ -1536,6 +1601,37 @@ app.post("/api/user/withdraw", (req, res) => {
   writeDB(db);
   res.json({ success: true, user });
 });
+
+// Helper to save Base64 data URLs to local file uploads
+function saveBase64Image(base64Str: string | undefined | null, prefix: string): string {
+  if (!base64Str) return "";
+  if (!base64Str.startsWith("data:")) return base64Str; // if it's already an URL, keep as is
+
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Str;
+    }
+
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, "base64");
+
+    let ext = "png";
+    if (mimeType.includes("pdf")) ext = "pdf";
+    else if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
+    else if (mimeType.includes("webp")) ext = "webp";
+
+    const fileName = `${prefix}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}.${ext}`;
+    const filePath = path.join(process.cwd(), "uploads", fileName);
+
+    fs.writeFileSync(filePath, buffer);
+    return `/uploads/${fileName}`;
+  } catch (err) {
+    console.error("Error saving base64 uploaded file:", err);
+    return base64Str;
+  }
+}
 
 // API: Apply for a Micro-Loan
 app.post("/api/user/loan/apply", (req, res) => {
@@ -1566,6 +1662,12 @@ app.post("/api/user/loan/apply", (req, res) => {
 
   const user = db.users[userIndex];
   const loanId = `LN${Math.floor(10125 + Math.random() * 9000)}`;
+
+  const savedNidFront = saveBase64Image(nidFrontUrl, "nidFront");
+  const savedNidBack = saveBase64Image(nidBackUrl, "nidBack");
+  const savedSelfie = saveBase64Image(selfieUrl, "selfie");
+  const savedIncomeProof = saveBase64Image(incomeProofUrl, "incomeProof");
+  const savedAddressProof = saveBase64Image(addressProofUrl, "addressProof");
   
   const loanItem = {
     category,
@@ -1576,14 +1678,15 @@ app.post("/api/user/loan/apply", (req, res) => {
     emiAmount: Number(emiAmount),
     id: loanId,
     status: "pending",
-    date: "০৯ জুন, ২০২৬",
+    date: getCurrentBanglaDateString(),
+    createdAt: Date.now(),
     repaidCount: 0,
     totalInstallments: Number(months),
-    nidFrontUrl: nidFrontUrl || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
-    nidBackUrl: nidBackUrl || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
-    selfieUrl: selfieUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
-    incomeProofUrl: incomeProofUrl || "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&q=80&w=350",
-    addressProofUrl: addressProofUrl || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+    nidFrontUrl: savedNidFront || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+    nidBackUrl: savedNidBack || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+    selfieUrl: savedSelfie || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
+    incomeProofUrl: savedIncomeProof || "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&q=80&w=350",
+    addressProofUrl: savedAddressProof || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
     addressProofType: addressProofType || "electricity",
   };
 
@@ -1594,6 +1697,7 @@ app.post("/api/user/loan/apply", (req, res) => {
     title: "ঋণ আবেদন সফলভাবে গৃহীত হয়েছে",
     body: `আপনার ${categoryBangla} আবেদন ${loanId} রিভিউর অপেক্ষায় রয়েছে। খুব দ্রুত যাচাই করা হবে।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "info",
   };
@@ -1665,6 +1769,7 @@ app.post("/api/user/loan/approve", (req, res) => {
     title: "ঋণ বিতরণ সম্পন্ন!",
     body: `আপনার ${approvedTitle} চূড়ান্তভাবে অনুমোদিত হয়েছে এবং ৳ ${approvedAmount.toLocaleString("bn-BD")} আপনার সঞ্চয় অ্যাকাউন্টে প্রেরণ করা হয়েছে।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "success",
   };
@@ -1734,6 +1839,7 @@ app.post("/api/user/loan/pay-emi", (req, res) => {
     title: `কিস্তি #${installmentNo} সফল পেমেন্ট`,
     body: `আপনার ঋণ কিস্তি #${installmentNo} এর জন্য ৳ ${Number(amount).toLocaleString("bn-BD")} পরিশোধ সম্পন্ন হয়েছে।`,
     timeLabel: "এইমাত্র",
+    createdAt: Date.now(),
     isRead: false,
     type: "success",
   };
@@ -1974,7 +2080,13 @@ app.post("/api/admin/settings/update", (req, res) => {
     bkashLogo: settings.bkashLogo !== undefined ? settings.bkashLogo : "",
     nagadLogo: settings.nagadLogo !== undefined ? settings.nagadLogo : "",
     whatsappNumber: settings.whatsappNumber !== undefined ? settings.whatsappNumber : "",
-    helpCenterLogo: settings.helpCenterLogo !== undefined ? settings.helpCenterLogo : ""
+    helpCenterLogo: settings.helpCenterLogo !== undefined ? settings.helpCenterLogo : "",
+    minLoanAmount: Number(settings.minLoanAmount) !== undefined ? Number(settings.minLoanAmount) : 10000,
+    maxLoanAmount: Number(settings.maxLoanAmount) !== undefined ? Number(settings.maxLoanAmount) : 200000,
+    loanAmountPresets: settings.loanAmountPresets !== undefined ? settings.loanAmountPresets : "20000, 30000, 50000, 100000",
+    minLoanMonths: Number(settings.minLoanMonths) !== undefined ? Number(settings.minLoanMonths) : 3,
+    maxLoanMonths: Number(settings.maxLoanMonths) !== undefined ? Number(settings.maxLoanMonths) : 18,
+    loanMonthPresets: settings.loanMonthPresets !== undefined ? settings.loanMonthPresets : "3, 6, 9, 12"
   };
 
   writeDB(db);
@@ -2158,6 +2270,7 @@ app.post("/api/admin/user/create", (req, res) => {
         title: "অ্যাডমিন কর্তৃক অ্যাকাউন্ট তৈরিকরণ",
         body: `স্বাগতম! অ্যাডমিন প্যানেল থেকে আপনার মেম্বারশিপ অ্যাকাউন্ট খোলা হয়েছে। প্রাথমিক ব্যালেন্স: ৳ ${initialBal.toLocaleString()}`,
         timeLabel: "এইমাত্র",
+        createdAt: Date.now(),
         isRead: false,
         type: "success" as const
       }
@@ -2198,6 +2311,7 @@ app.post("/api/admin/user/update", (req, res) => {
         title: req.body.customNotification.title || "বিশেষ বিজ্ঞপ্তি",
         body: req.body.customNotification.body || "",
         timeLabel: "এইমাত্র",
+        createdAt: Date.now(),
         isRead: false,
         type: req.body.customNotification.type || "info"
       });
@@ -2276,6 +2390,7 @@ app.post("/api/admin/user/update", (req, res) => {
           title: "হিসাব সমন্বয় বিজ্ঞপ্তি",
           body: `অ্যাডমিন কর্তৃক আপনার সঞ্চয় ব্যালেন্স সমন্বয় করা হয়েছে। নতুন ব্যালেন্স: ৳ ${newBal.toLocaleString()}`,
           timeLabel: "এইমাত্র",
+          createdAt: Date.now(),
           isRead: false,
           type: "info"
         });
@@ -2397,7 +2512,8 @@ app.post("/api/admin/user/loan/update", (req, res) => {
       interestRate: 14,
       emiAmount: emiAmt,
       status: status || "approved",
-      date: "০৯ জুন, ২০২৬",
+      date: getCurrentBanglaDateString(),
+      createdAt: Date.now(),
       repaidCount: Number(repaidCount) || 0,
       totalInstallments: Number(totalInstallments) || loanMths
     };
@@ -2517,6 +2633,7 @@ app.post("/api/admin/loan/update-status", (req, res) => {
       title: "ঋণ বিতরণ সম্পন্ন!",
       body: `আপনার ${loanDetails.categoryBangla} (ID: ${loanId}) চূড়ান্তভাবে অনুমোদিত হয়েছে এবং ৳ ${loanDetails.amount.toLocaleString()} আপনার সঞ্চয় অ্যাকাউন্টে পাঠানো হয়েছে।`,
       timeLabel: "এইমাত্র",
+      createdAt: Date.now(),
       isRead: false,
       type: "success"
     });
@@ -2527,6 +2644,7 @@ app.post("/api/admin/loan/update-status", (req, res) => {
       title: "ঋণ আবেদন বাতিল",
       body: `দুঃখিত, আপনার ${loanDetails.categoryBangla} (ID: ${loanId}) আবেদনটি বাতিল করা হয়েছে। বিস্তারিত জানতে শাখা অফিসে যোগাযোগ করুন।`,
       timeLabel: "এইমাত্র",
+      createdAt: Date.now(),
       isRead: false,
       type: "warn"
     });

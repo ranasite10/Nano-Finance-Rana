@@ -164,7 +164,13 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     bkashLogo: '',
     nagadLogo: '',
     whatsappNumber: '',
-    helpCenterLogo: ''
+    helpCenterLogo: '',
+    minLoanAmount: 10000,
+    maxLoanAmount: 200000,
+    loanAmountPresets: '20000, 30000, 50000, 100000',
+    minLoanMonths: 3,
+    maxLoanMonths: 18,
+    loanMonthPresets: '3, 6, 9, 12'
   });
 
   // User details adjustment modal
@@ -275,7 +281,13 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           bkashLogo: data.settings.bkashLogo || '',
           nagadLogo: data.settings.nagadLogo || '',
           whatsappNumber: data.settings.whatsappNumber || '',
-          helpCenterLogo: data.settings.helpCenterLogo || ''
+          helpCenterLogo: data.settings.helpCenterLogo || '',
+          minLoanAmount: data.settings.minLoanAmount !== undefined ? data.settings.minLoanAmount : 10000,
+          maxLoanAmount: data.settings.maxLoanAmount !== undefined ? data.settings.maxLoanAmount : 200000,
+          loanAmountPresets: data.settings.loanAmountPresets !== undefined ? data.settings.loanAmountPresets : "20000, 30000, 50000, 100000",
+          minLoanMonths: data.settings.minLoanMonths !== undefined ? data.settings.minLoanMonths : 3,
+          maxLoanMonths: data.settings.maxLoanMonths !== undefined ? data.settings.maxLoanMonths : 18,
+          loanMonthPresets: data.settings.loanMonthPresets !== undefined ? data.settings.loanMonthPresets : "3, 6, 9, 12"
         });
         setUsers(data.users || []);
         setSubAdmins(data.subAdmins || []);
@@ -843,6 +855,32 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
 
     return `${toBanglaDigits(diffDays)} দিন আগে`;
+  };
+
+  const getLoanRelativeTimeLabel = (createdAt?: number): string => {
+    if (!createdAt) return '';
+    const diffMs = Date.now() - createdAt;
+    if (diffMs < 0) return ' (এইমাত্র)';
+
+    const diffMins = Math.floor(diffMs / (60 * 1000));
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+
+    if (diffDays < 1) {
+      if (diffMins < 1) {
+        return ' (এইমাত্র)';
+      }
+      if (diffHours < 1) {
+        return ` (${toBanglaDigits(diffMins)} মিনিট আগে)`;
+      }
+      const remainingMins = diffMins % 60;
+      if (remainingMins === 0) {
+        return ` (${toBanglaDigits(diffHours)} ঘণ্টা আগে)`;
+      }
+      return ` (${toBanglaDigits(diffHours)} ঘণ্টা ${toBanglaDigits(remainingMins)} মিনিট আগে)`;
+    }
+
+    return '';
   };
 
   // Handle saving sub admin (Main Admin only!)
@@ -3274,7 +3312,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             <span className="text-zinc-500">গ্রাহকের সঞ্চয় ব্যালেন্স:</span> <span className="font-mono font-medium text-emerald-400 ml-1">৳ {toBanglaDigits((u.savingsBalance || 0).toLocaleString())}</span>
                           </div>
                           <div>
-                            <span className="text-zinc-500">আবেদনের তারিখ সময়:</span> <span className="text-zinc-300 ml-1 font-mono">{toBanglaDigits(loan.date || '০৯ জুন, ২০২৬')}</span>
+                            <span className="text-zinc-500">আবেদনের তারিখ সময়:</span> <span className="text-zinc-300 ml-1 font-mono">{toBanglaDigits(loan.date || '০৯ জুন, ২০২৬')}{getLoanRelativeTimeLabel(loan.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -3673,6 +3711,82 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     onChange={(e) => setSettingsForm({ ...settingsForm, depositPresets: e.target.value })}
                     placeholder="যেমন: 20, 50, 100, 500"
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Loan Calculator Configuration */}
+              <div className="pt-2.5 mt-1 border-t border-dashed border-zinc-800/80">
+                <h5 className="text-[10px] font-bold text-[#c5a059] uppercase tracking-wider mb-2.5">
+                  ঋণ ক্যালকুলেটর কাস্টমাইজেশন (Dynamic Loan Simulator Settings)
+                </h5>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="text-[10px] text-zinc-455 block mb-1">ক্যালকুলেটর সর্বনিম্ন ঋণ (৳)</label>
+                    <input
+                      type="number"
+                      required
+                      value={settingsForm.minLoanAmount}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, minLoanAmount: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-455 block mb-1">ক্যালকুলেটর সর্বোচ্চ ঋণ (৳)</label>
+                    <input
+                      type="number"
+                      required
+                      value={settingsForm.maxLoanAmount}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, maxLoanAmount: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="text-[10px] text-zinc-455 block mb-1">ঋণের পরিমাণ সাজেশন প্রিসেটস (কমা দিয়ে আলাদা করুন)</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsForm.loanAmountPresets}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, loanAmountPresets: e.target.value })}
+                    placeholder="যেমন: 20000, 30000, 50000, 100000"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5 mt-3">
+                  <div>
+                    <label className="text-[10px] text-zinc-455 block mb-1">ক্যালকুলেটর সর্বনিম্ন মেয়াদ (মাস)</label>
+                    <input
+                      type="number"
+                      required
+                      value={settingsForm.minLoanMonths}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, minLoanMonths: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-455 block mb-1">ক্যালকুলেটর সর্বোচ্চ মেয়াদ (মাস)</label>
+                    <input
+                      type="number"
+                      required
+                      value={settingsForm.maxLoanMonths}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, maxLoanMonths: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="text-[10px] text-zinc-455 block mb-1">মেয়াদ সাজেশন প্রিসেটস (কমা দিয়ে আলাদা করুন)</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsForm.loanMonthPresets}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, loanMonthPresets: e.target.value })}
+                    placeholder="যেমন: 3, 6, 9, 12"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
                   />
                 </div>
               </div>

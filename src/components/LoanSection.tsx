@@ -95,6 +95,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
 
   const [activeSelectionField, setActiveSelectionField] = useState<'nidFront' | 'nidBack' | 'selfie' | 'addressProof' | null>(null);
   const [validationError, setValidationError] = useState<{ title: string; message: string } | null>(null);
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
 
   const handleUploadClick = (field: 'nidFront' | 'nidBack' | 'selfie' | 'addressProof') => {
     setActiveSelectionField(field);
@@ -116,7 +117,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
 
   const { emi, total, rate: dynamicRate } = getEmiDetails();
 
-  const handleFileChange = (field: keyof NewLoanForm, file: File | null) => {
+  const handleFileChange = async (field: keyof NewLoanForm, file: File | null) => {
     if (!file) return;
 
     const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name);
@@ -160,19 +161,90 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
       }
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    setForm((prev) => {
-      const updated = {
-        ...prev,
-        [field]: file,
-        [`${field}Url`]: objectUrl,
-      };
-      if (field === 'addressProof') {
-        updated.incomeProof = file;
-        updated.incomeProofUrl = objectUrl;
-      }
-      return updated;
-    });
+    setUploadingFields((prev) => ({ ...prev, [field]: true }));
+
+    try {
+      const base64DataUrl = await new Promise<string>((resolve, reject) => {
+        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (error) => reject(error);
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            const MAX_DIM = 1200;
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(event.target?.result as string);
+              return;
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve(dataUrl);
+          };
+          img.onerror = () => {
+            const fallbackReader = new FileReader();
+            fallbackReader.onload = () => resolve(fallbackReader.result as string);
+            fallbackReader.readAsDataURL(file);
+          };
+          img.src = event.target?.result as string;
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+      });
+
+      setForm((prev) => {
+        const updated = {
+          ...prev,
+          [field]: file,
+          [`${field}Url`]: base64DataUrl,
+        };
+        if (field === 'addressProof') {
+          updated.incomeProof = file;
+          updated.incomeProofUrl = base64DataUrl;
+        }
+        return updated;
+      });
+    } catch (err) {
+      console.error('File compression to base64 error, using standard file object url fallback:', err);
+      const objectUrl = URL.createObjectURL(file);
+      setForm((prev) => {
+        const updated = {
+          ...prev,
+          [field]: file,
+          [`${field}Url`]: objectUrl,
+        };
+        if (field === 'addressProof') {
+          updated.incomeProof = file;
+          updated.incomeProofUrl = objectUrl;
+        }
+        return updated;
+      });
+    } finally {
+      setUploadingFields((prev) => ({ ...prev, [field]: false }));
+    }
   };
 
   const handleDragOver = (e: React.DragEvent, field: string) => {
@@ -221,6 +293,17 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     const loanId = `LN${Math.floor(10125 + Math.random() * 900)}`;
     const categoryBangla = categoryNames[form.category] || 'সাধারণ ঋণ';
 
+    // Generate dynamic submission date in Bengali
+    const currentDateObj = new Date();
+    const currentDay = currentDateObj.getDate();
+    const monthsBangla = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    const currentMonth = monthsBangla[currentDateObj.getMonth()];
+    const currentYear = currentDateObj.getFullYear();
+    const dynamicDateString = `${toBanglaDigits(currentDay.toString().padStart(2, '0'))} ${currentMonth}, ${toBanglaDigits(currentYear)}`;
+
     // Generate and download PDF receipt automatically
     try {
       generateLoanPDF({
@@ -230,7 +313,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
         total,
         applicationId: loanId,
         categoryBangla,
-        dateString: '০৮ জুন, ২০২৬'
+        dateString: dynamicDateString
       });
     } catch (e) {
       console.error('Failed to generate PDF:', e);
@@ -529,8 +612,14 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 onDragOver={(e) => handleDragOver(e, 'nidFront')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'nidFront')}
-                className={`border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'nidFront' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'nidFront' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
+                {uploadingFields.nidFront && (
+                  <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent border-[#c5a059] mb-1.5" />
+                    <span className="text-[10px] text-zinc-300 font-sans">প্রসেসিং...</span>
+                  </div>
+                )}
                 {/* Standard input for gallery/files selection */}
                 <input
                   type="file"
@@ -594,8 +683,14 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 onDragOver={(e) => handleDragOver(e, 'nidBack')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'nidBack')}
-                className={`border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'nidBack' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'nidBack' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
+                {uploadingFields.nidBack && (
+                  <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent border-[#c5a059] mb-1.5" />
+                    <span className="text-[10px] text-zinc-300 font-sans">প্রসেসিং...</span>
+                  </div>
+                )}
                 {/* Standard input for gallery/files selection */}
                 <input
                   type="file"
@@ -659,8 +754,14 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 onDragOver={(e) => handleDragOver(e, 'selfie')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'selfie')}
-                className={`border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'selfie' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'selfie' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
+                {uploadingFields.selfie && (
+                  <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent border-[#c5a059] mb-1.5" />
+                    <span className="text-[10px] text-zinc-300 font-sans">প্রসেসিং...</span>
+                  </div>
+                )}
                 {/* Standard input for gallery/files selection */}
                 <input
                   type="file"
@@ -724,8 +825,14 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 onDragOver={(e) => handleDragOver(e, 'addressProof')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'addressProof')}
-                className={`border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'addressProof' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'addressProof' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
+                {uploadingFields.addressProof && (
+                  <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent border-[#c5a059] mb-1.5" />
+                    <span className="text-[10px] text-zinc-300 font-sans">প্রসেসিং...</span>
+                  </div>
+                )}
                 {/* Standard input for gallery/files selection */}
                 <input
                   type="file"
@@ -747,7 +854,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 {form.addressProofUrl ? (
                   <div className="relative group w-full h-full flex flex-col items-center justify-center">
                     <div className="w-full h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center mb-1">
-                      {form.addressProofUrl.startsWith('blob:') || form.addressProofUrl.includes('unsplash.com') || form.addressProofUrl.includes('http') ? (
+                      {form.addressProofUrl.startsWith('data:image/') || form.addressProofUrl.startsWith('blob:') || form.addressProofUrl.includes('unsplash.com') || form.addressProofUrl.includes('http') || form.addressProofUrl.startsWith('/') ? (
                         <img
                           src={form.addressProofUrl}
                           alt="Bank Statement Thumbnail"

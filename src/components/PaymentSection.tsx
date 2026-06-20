@@ -4,12 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { ArrowLeft, Download, ShieldCheck, CheckCircle2, Ticket } from 'lucide-react';
-import { EmiInstallment, PaymentMethod, LoanItem } from '../types';
+import { ArrowLeft, Download, ShieldCheck, CheckCircle2, Ticket, FileText } from 'lucide-react';
+import { EmiInstallment, PaymentMethod, LoanItem, User } from '../types';
 import OnlineCheckoutGateway from './OnlineCheckoutGateway';
 import { cleanNumericInput } from '../utils/digitConverter';
+import { generatePaymentReceiptPDF } from '../utils/pdfGenerator';
 
 interface PaymentSectionProps {
+  user?: User;
   savingsBalance: number;
   emiInstallments: EmiInstallment[];
   activeLoans: LoanItem[];
@@ -19,7 +21,7 @@ interface PaymentSectionProps {
   settings?: any;
 }
 
-export default function PaymentSection({ savingsBalance, emiInstallments, activeLoans, onBack, onPaySuccess, onDepositComplete, settings }: PaymentSectionProps) {
+export default function PaymentSection({ user, savingsBalance, emiInstallments, activeLoans, onBack, onPaySuccess, onDepositComplete, settings }: PaymentSectionProps) {
   // Screen views: 'schedule' (Screen 11), 'pay' (Screen 12)
   const [panel, setPanel] = useState<'schedule' | 'pay'>('schedule');
   const [selectedEmi, setSelectedEmi] = useState<EmiInstallment | null>(null);
@@ -29,7 +31,16 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bkash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successTxId, setSuccessTxId] = useState('');
   const [pin, setPin] = useState('');
+
+  React.useEffect(() => {
+    if (isSuccess && !successTxId) {
+      setSuccessTxId(`TX${Math.floor(22485 + Math.random() * 6800)}`);
+    } else if (!isSuccess && successTxId) {
+      setSuccessTxId('');
+    }
+  }, [isSuccess]);
 
   // Savings Deposit specific states within PaymentSection
   const getPresets = () => {
@@ -104,6 +115,42 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
       setIsProcessing(false);
       setIsSuccess(true);
     }, 1000);
+  };
+
+  const handleDownloadReceipt = () => {
+    if (!selectedEmi) return;
+
+    // generate dynamic date in Bengali
+    const currentDateObj = new Date();
+    const currentDay = currentDateObj.getDate();
+    const monthsBangla = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    const currentMonth = monthsBangla[currentDateObj.getMonth()];
+    const currentYear = currentDateObj.getFullYear();
+    const dateString = `${currentDay.toString().padStart(2, '0')} ${currentMonth}, ${currentYear}`;
+
+    const activeUser: User = user || {
+      name: 'সদস্য গ্রাহক',
+      phone: '01700000055',
+      accountNo: 'LA-98472901-52',
+      isLoggedIn: true,
+      isVerified: true,
+      role: 'user'
+    };
+
+    const loanId = activeLoans[0]?.id || 'LN5923';
+
+    generatePaymentReceiptPDF({
+      user: activeUser,
+      amount: selectedEmi.amount,
+      installmentNo: selectedEmi.installmentNo,
+      paymentMethod,
+      transactionId: successTxId,
+      loanId,
+      dateString,
+    });
   };
 
   const handleDepositSubmit = (e: React.FormEvent) => {
@@ -568,46 +615,68 @@ export default function PaymentSection({ savingsBalance, emiInstallments, active
 
       {/* Success alert card */}
       {isSuccess && selectedEmi && (
-        <div className="absolute inset-0 bg-[#0a0a09] flex flex-col items-center justify-center p-6 z-20 text-center animate-fade-in select-none">
-          <div className="relative flex items-center justify-center w-20 h-20 bg-emerald-950/20 text-emerald-400 rounded-full animate-bounce duration-1000 border-4 border-emerald-900/30 mb-5 animate-bounce">
-            <CheckCircle2 className="w-12 h-12" />
+        <div className="absolute inset-0 bg-[#0a0a09] flex flex-col items-center justify-center p-6 z-20 text-center animate-fade-in select-none overflow-y-auto">
+          <div className="relative flex items-center justify-center w-16 h-16 bg-emerald-950/20 text-emerald-400 rounded-full border-4 border-emerald-900/30 mb-4 animate-bounce">
+            <CheckCircle2 className="w-10 h-10" />
           </div>
 
-          <h3 className="text-lg font-bold font-serif italic text-white mb-1">কিস্তি পরিশোধ সফল!</h3>
-          <p className="text-xs text-zinc-450 font-sans leading-relaxed max-w-[240px] mb-6">
-            ঋণ কিস্তি #{toBanglaDigits(selectedEmi.installmentNo)} সফলভাবে পরিশোধ সম্পন্ন হয়েছে।
+          <h3 className="text-base font-bold text-emerald-450 mb-1">কিস্তি পরিশোধ সম্পন্ন হয়েছে!</h3>
+          <p className="text-[11px] text-zinc-400 font-sans leading-relaxed max-w-[250px] mb-4">
+            আপনার ঋণ কিস্তি #{toBanglaDigits(selectedEmi.installmentNo)} সফলভাবে পরিশোধ অবমুক্ত করা হয়েছে।
           </p>
 
-          <div className="bg-[#111113] rounded-2xl p-4 w-full flex flex-col gap-2.5 text-left mb-6 font-sans border border-zinc-850">
+          <div className="bg-[#111113] rounded-2xl p-4 w-full flex flex-col gap-2.5 text-left mb-5 font-sans border border-emerald-900/10 relative overflow-hidden">
+            {/* Watermark-style light stamp in background */}
+            <div className="absolute -right-3 -bottom-3 text-[50px] font-black italic select-none text-emerald-900/5 rotate-12 pointer-events-none">
+              D-PAID
+            </div>
+
+            <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-zinc-850">
+              <span className="text-zinc-500 uppercase font-bold tracking-wider">রসিদ বিবরণী</span>
+              <span className="bg-emerald-950 text-emerald-400 border border-emerald-900/30 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase animate-pulse">
+                অনুমোদিত • Verified
+              </span>
+            </div>
+
             <div className="flex justify-between text-xs text-zinc-400">
               <span>পরিশোধ মাধ্যম:</span>
               <span className="font-bold text-zinc-200">{getMethodNameDesc(paymentMethod)}</span>
             </div>
             <div className="flex justify-between text-xs text-zinc-400">
-              <span>পরিমাণ:</span>
-              <span className="font-bold text-emerald-450">{formatBDT(selectedEmi.amount)}</span>
+              <span>কিস্তির পরিমাণ:</span>
+              <span className="font-extrabold text-[#dfc187] font-mono">{formatBDT(selectedEmi.amount)}</span>
             </div>
             <div className="flex justify-between text-xs text-zinc-400">
-              <span>কিস্তি নং:</span>
-              <span className="text-zinc-200">#{toBanglaDigits(selectedEmi.installmentNo)}</span>
+              <span>কিস্তি সনাক্তকরণ নম্বর:</span>
+              <span className="text-zinc-200 font-bold">#{toBanglaDigits(selectedEmi.installmentNo)} নং কিস্তি</span>
             </div>
-            <div className="flex justify-between text-[11px] text-zinc-550 pt-2 border-t border-zinc-850">
-              <span>ট্রানজেকশন আইডি:</span>
-              <span className="font-mono">TX{Math.floor(22000 + Math.random() * 9000)}</span>
+            <div className="flex justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-850">
+              <span>ডেস্কটপ ট্রানজেকশন আইডি:</span>
+              <span className="font-mono text-zinc-300 font-bold select-all bg-zinc-900/60 px-1.5 py-0.5 rounded border border-zinc-800">{successTxId}</span>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              setIsSuccess(false);
-              setPanel('schedule');
-              onPaySuccess(selectedEmi.installmentNo, selectedEmi.amount, paymentMethod);
-            }}
-            id="btn-payment-success-ok"
-            className="w-full bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 py-3 rounded-xl font-bold font-sans text-xs transition-colors shadow-md text-center cursor-pointer"
-          >
-            কিস্তির তালিকায় ফিরে যান
-          </button>
+          <div className="flex flex-col gap-2.5 w-full">
+            <button
+              onClick={handleDownloadReceipt}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-bold font-sans text-xs transition-colors shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer border border-emerald-500/10"
+            >
+              <FileText className="w-4 h-4" />
+              অফিশিয়াল রসিদ ডাউনলোড করুন (PDF)
+            </button>
+
+            <button
+              onClick={() => {
+                setIsSuccess(false);
+                setPanel('schedule');
+                onPaySuccess(selectedEmi.installmentNo, selectedEmi.amount, paymentMethod);
+              }}
+              id="btn-payment-success-ok"
+              className="w-full bg-[#1c1c1e] text-zinc-300 hover:bg-zinc-800 py-2.5 rounded-xl font-bold font-sans text-xs transition-colors border border-zinc-800 text-center cursor-pointer"
+            >
+              কিস্তির তালিকায় ফিরে যান
+            </button>
+          </div>
         </div>
       )}
 

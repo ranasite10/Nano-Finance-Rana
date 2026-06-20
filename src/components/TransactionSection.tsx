@@ -25,8 +25,50 @@ export default function TransactionSection({ transactions, onBack }: Transaction
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
   };
 
+  const parseBanglaDate = (dateStr: string): number => {
+    if (!dateStr) return 0;
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    let englishStr = dateStr.toString();
+    for (let i = 0; i < 10; i++) {
+      englishStr = englishStr.replaceAll(banglaDigits[i], i.toString());
+    }
+    const monthsMap: Record<string, number> = {
+      'জানুয়ারি': 0, 'জানুয়ারি': 0,
+      'ফেব্রুয়ারি': 1, 'ফেব্রুয়ারি': 1,
+      'মার্চ': 2,
+      'এপ্রিল': 3,
+      'মে': 4,
+      'জুন': 5,
+      'জুলাই': 6,
+      'আগস্ট': 7,
+      'সেপ্টেম্বর': 8,
+      'অক্টোবর': 9,
+      'নভেম্বর': 10,
+      'ডিসেম্বর': 11
+    };
+    const parts = englishStr.split(/[\s,]+/);
+    if (parts.length >= 3) {
+      const day = parseInt(parts[0], 10) || 1;
+      const monthName = parts[1];
+      const month = monthsMap[monthName] !== undefined ? monthsMap[monthName] : 5;
+      const year = parseInt(parts[2], 10) || 2026;
+      return new Date(year, month, day).getTime();
+    }
+    return 0;
+  };
+
+  // Sort transactions automatically by date descending (most recent first)
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    const timeA = (a as any).createdAt || parseBanglaDate(a.date);
+    const timeB = (b as any).createdAt || parseBanglaDate(b.date);
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return b.id.localeCompare(a.id);
+  });
+
   // Filter lists based on type and search query
-  const filteredList = transactions.filter((tx) => {
+  const filteredList = sortedTransactions.filter((tx) => {
     const matchesFilter = filter === 'all' ? true : tx.type === filter;
     const matchesSearch =
       tx.titleBangla.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -67,7 +109,7 @@ export default function TransactionSection({ transactions, onBack }: Transaction
       </div>
 
       {/* Screen 13 filter tabs */}
-      <div className="bg-[#111113] p-1 rounded-xl border border-zinc-850/80 shadow-3xs flex gap-1 mb-4 font-sans">
+      <div className="bg-[#111113] p-1 rounded-xl border border-zinc-850/80 shadow-3xs flex gap-1 mb-3.5 font-sans">
         {[
           { id: 'all', label: 'সব' },
           { id: 'deposit', label: 'জমা' },
@@ -82,6 +124,40 @@ export default function TransactionSection({ transactions, onBack }: Transaction
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Compact Icon-Based Toggle Filter */}
+      <div className="flex items-center justify-between mb-4 bg-zinc-950/60 p-2 rounded-xl border border-zinc-900/80">
+        <span className="text-[10px] font-sans font-extrabold text-[#c5a059] uppercase tracking-wider pl-1 flex items-center gap-1">
+          <Filter className="w-3 h-3 text-[#c5a059]" /> কুইক ফিল্টার
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setFilter(filter === 'deposit' ? 'all' : 'deposit')}
+            className={`cursor-pointer group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all border ${
+              filter === 'deposit'
+                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/30'
+                : 'bg-zinc-900/50 text-zinc-500 border-transparent hover:text-zinc-400 hover:bg-zinc-900/80'
+            }`}
+            title="শুধু জমা দেখুন"
+          >
+            <ArrowUpRight className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform" />
+            জমা (Deposit)
+          </button>
+
+          <button
+            onClick={() => setFilter(filter === 'withdraw' ? 'all' : 'withdraw')}
+            className={`cursor-pointer group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all border ${
+              filter === 'withdraw'
+                ? 'bg-rose-950/40 text-rose-400 border-rose-900/30'
+                : 'bg-zinc-900/50 text-zinc-500 border-transparent hover:text-zinc-400 hover:bg-zinc-900/80'
+            }`}
+            title="শুধু উত্তোলন দেখুন"
+          >
+            <ArrowDownRight className="w-3 h-3 text-rose-450 group-hover:scale-110 transition-transform" />
+            উত্তোলন (Withdraw)
+          </button>
+        </div>
       </div>
 
       {/* Render Lists */}
