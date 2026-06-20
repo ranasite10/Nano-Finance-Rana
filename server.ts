@@ -556,7 +556,9 @@ const DEFAULT_SETTINGS = {
   loanAmountPresets: "20000, 30000, 50000, 100000",
   minLoanMonths: 3,
   maxLoanMonths: 18,
-  loanMonthPresets: "3, 6, 9, 12"
+  loanMonthPresets: "3, 6, 9, 12",
+  requireMinSavingsForLoan: false,
+  minSavingsForLoanAmount: 500
 };
 
 // Helper to brute force and decode a 4-6 digit SHA-256 PIN back to plain text
@@ -636,6 +638,14 @@ function runDatabaseMigrations(db: any): boolean {
     }
     if (db.settings.loanMonthPresets === undefined) {
       db.settings.loanMonthPresets = "3, 6, 9, 12";
+      modified = true;
+    }
+    if (db.settings.requireMinSavingsForLoan === undefined) {
+      db.settings.requireMinSavingsForLoan = false;
+      modified = true;
+    }
+    if (db.settings.minSavingsForLoanAmount === undefined) {
+      db.settings.minSavingsForLoanAmount = 500;
       modified = true;
     }
   }
@@ -2086,7 +2096,9 @@ app.post("/api/admin/settings/update", (req, res) => {
     loanAmountPresets: settings.loanAmountPresets !== undefined ? settings.loanAmountPresets : "20000, 30000, 50000, 100000",
     minLoanMonths: Number(settings.minLoanMonths) !== undefined ? Number(settings.minLoanMonths) : 3,
     maxLoanMonths: Number(settings.maxLoanMonths) !== undefined ? Number(settings.maxLoanMonths) : 18,
-    loanMonthPresets: settings.loanMonthPresets !== undefined ? settings.loanMonthPresets : "3, 6, 9, 12"
+    loanMonthPresets: settings.loanMonthPresets !== undefined ? settings.loanMonthPresets : "3, 6, 9, 12",
+    requireMinSavingsForLoan: settings.requireMinSavingsForLoan !== undefined ? !!settings.requireMinSavingsForLoan : false,
+    minSavingsForLoanAmount: Number(settings.minSavingsForLoanAmount) !== undefined ? Number(settings.minSavingsForLoanAmount) : 500
   };
 
   writeDB(db);

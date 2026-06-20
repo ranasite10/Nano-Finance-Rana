@@ -724,6 +724,7 @@ export default function App() {
             initialStep={1}
             user={user}
             settings={settings}
+            savingsBalance={savingsBalance}
           />
         );
       case 'loan_calc':
@@ -735,6 +736,7 @@ export default function App() {
             initialStep={2}
             user={user}
             settings={settings}
+            savingsBalance={savingsBalance}
           />
         );
       case 'documents_upload':
@@ -746,6 +748,7 @@ export default function App() {
             initialStep={3}
             user={user}
             settings={settings}
+            savingsBalance={savingsBalance}
           />
         );
       case 'loan_status':
@@ -757,6 +760,7 @@ export default function App() {
             initialStep={4}
             user={user}
             settings={settings}
+            savingsBalance={savingsBalance}
           />
         );
       case 'emi_schedule':

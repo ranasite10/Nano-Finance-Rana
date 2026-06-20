@@ -170,7 +170,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     loanAmountPresets: '20000, 30000, 50000, 100000',
     minLoanMonths: 3,
     maxLoanMonths: 18,
-    loanMonthPresets: '3, 6, 9, 12'
+    loanMonthPresets: '3, 6, 9, 12',
+    requireMinSavingsForLoan: false,
+    minSavingsForLoanAmount: 500
   });
 
   // User details adjustment modal
@@ -287,7 +289,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           loanAmountPresets: data.settings.loanAmountPresets !== undefined ? data.settings.loanAmountPresets : "20000, 30000, 50000, 100000",
           minLoanMonths: data.settings.minLoanMonths !== undefined ? data.settings.minLoanMonths : 3,
           maxLoanMonths: data.settings.maxLoanMonths !== undefined ? data.settings.maxLoanMonths : 18,
-          loanMonthPresets: data.settings.loanMonthPresets !== undefined ? data.settings.loanMonthPresets : "3, 6, 9, 12"
+          loanMonthPresets: data.settings.loanMonthPresets !== undefined ? data.settings.loanMonthPresets : "3, 6, 9, 12",
+          requireMinSavingsForLoan: data.settings.requireMinSavingsForLoan !== undefined ? !!data.settings.requireMinSavingsForLoan : false,
+          minSavingsForLoanAmount: data.settings.minSavingsForLoanAmount !== undefined ? Number(data.settings.minSavingsForLoanAmount) : 500
         });
         setUsers(data.users || []);
         setSubAdmins(data.subAdmins || []);
@@ -1186,6 +1190,18 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     (u.activeLoans || []).forEach((loan: any) => {
       allLoansList.push({ user: u, loan });
     });
+  });
+
+  // Sort loans by createdAt descending (newest on top), falling back to loan ID descending if createdAt is missing or equal
+  allLoansList.sort((a, b) => {
+    const timeA = a.loan.createdAt || 0;
+    const timeB = b.loan.createdAt || 0;
+    if (timeA !== timeB) {
+      return timeB - timeA;
+    }
+    const idA = parseInt(a.loan.id.replace(/\D/g, '')) || 0;
+    const idB = parseInt(b.loan.id.replace(/\D/g, '')) || 0;
+    return idB - idA;
   });
 
   const pendingLoans = allLoansList.filter((item) => item.loan.status === 'pending');
@@ -3788,6 +3804,37 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     placeholder="যেমন: 3, 6, 9, 12"
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
                   />
+                </div>
+
+                <div className="mt-3.5 pt-3.5 border-t border-dashed border-zinc-800/60">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-zinc-300 block">মিনিমাম সঞ্চয় থাকলে ঋণ আবেদন</span>
+                      <span className="text-[9px] text-zinc-500 block">সদস্যের সঞ্চয় ব্যালেন্স থাকলে তবেই ঋণ আবেদন করতে পারবে কিনা</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.requireMinSavingsForLoan}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, requireMinSavingsForLoan: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {settingsForm.requireMinSavingsForLoan && (
+                    <div className="mt-2.5">
+                      <label className="text-[10px] text-zinc-455 block mb-1">প্রয়োজনীয় সর্বনিম্ন সঞ্চয় ব্যালেন্স (৳)</label>
+                      <input
+                        type="number"
+                        placeholder="যেমন: 500"
+                        value={settingsForm.minSavingsForLoanAmount}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, minSavingsForLoanAmount: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-[#c5a059]/40"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

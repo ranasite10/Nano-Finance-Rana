@@ -15,16 +15,31 @@ interface LoanSectionProps {
   initialStep?: number;
   user: User;
   settings?: any;
+  savingsBalance?: number;
 }
 
-export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initialStep = 4, user, settings }: LoanSectionProps) {
+export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initialStep = 4, user, settings, savingsBalance }: LoanSectionProps) {
+  const requireMinSavings = settings?.requireMinSavingsForLoan ?? false;
+  const minSavingsRequired = settings?.minSavingsForLoanAmount ?? 500;
+  const userSavings = savingsBalance !== undefined ? savingsBalance : (user?.savingsBalance ?? 0);
+
   // Stepper state: 1 (Category selection), 2 (Amount & Duration), 3 (Documents Upload), 4 (Status lists)
-  const [step, setStep] = useState<number>(initialStep);
+  const [step, setStep] = useState<number>(() => {
+    if (requireMinSavings && userSavings < minSavingsRequired && initialStep < 4) {
+      return 4;
+    }
+    return initialStep;
+  });
 
   // Synchronize state when sidebar navigates directly to various stepper screens
   useEffect(() => {
-    setStep(initialStep);
-  }, [initialStep]);
+    if (requireMinSavings && userSavings < minSavingsRequired && initialStep < 4) {
+      setShowMinSavingsAlert(true);
+      setStep(4);
+    } else {
+      setStep(initialStep);
+    }
+  }, [initialStep, user, settings, savingsBalance, requireMinSavings, minSavingsRequired, userSavings]);
 
   const [statusTab, setStatusTab] = useState<'all' | 'active' | 'repaid'>('all');
   const [expandedLoan, setExpandedLoan] = useState<string | null>(null);
@@ -96,6 +111,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
   const [activeSelectionField, setActiveSelectionField] = useState<'nidFront' | 'nidBack' | 'selfie' | 'addressProof' | null>(null);
   const [validationError, setValidationError] = useState<{ title: string; message: string } | null>(null);
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const [showMinSavingsAlert, setShowMinSavingsAlert] = useState<boolean>(false);
 
   const handleUploadClick = (field: 'nidFront' | 'nidBack' | 'selfie' | 'addressProof') => {
     setActiveSelectionField(field);
@@ -359,6 +375,14 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     });
   };
 
+  const handleNewApplication = () => {
+    if (requireMinSavings && userSavings < minSavingsRequired) {
+      setShowMinSavingsAlert(true);
+    } else {
+      setStep(1);
+    }
+  };
+
   const formatBDT = (amount: number) => {
     return `৳ ${Math.round(amount).toLocaleString('bn-BD')}`;
   };
@@ -369,12 +393,23 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
   };
 
   // Loan status filter calculation
-  const filteredLoans = activeLoans.filter((loan) => {
-    if (statusTab === 'all') return true;
-    if (statusTab === 'active') return loan.status === 'approved' || loan.status === 'pending';
-    if (statusTab === 'repaid') return loan.status === 'paid';
-    return true;
-  });
+  const filteredLoans = activeLoans
+    .filter((loan) => {
+      if (statusTab === 'all') return true;
+      if (statusTab === 'active') return loan.status === 'approved' || loan.status === 'pending';
+      if (statusTab === 'repaid') return loan.status === 'paid';
+      return true;
+    })
+    .sort((a, b) => {
+      const timeA = a.createdAt || 0;
+      const timeB = b.createdAt || 0;
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      const idA = parseInt(a.id.replace(/\D/g, '')) || 0;
+      const idB = parseInt(b.id.replace(/\D/g, '')) || 0;
+      return idB - idA;
+    });
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a09] text-zinc-300 select-none overflow-y-auto no-scrollbar pb-6">
@@ -406,7 +441,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
 
         {step === 4 && (
           <button
-            onClick={() => setStep(1)}
+            onClick={handleNewApplication}
             id="btn-loan-new-apply"
             className="bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 text-xs font-bold py-2 px-3.5 rounded-xl transition-colors font-sans cursor-pointer"
           >
@@ -1220,6 +1255,73 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
               type="button"
               onClick={() => setValidationError(null)}
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-red-500/25 to-red-600/15 hover:from-red-500/35 hover:to-red-600/25 border border-red-500/30 hover:border-red-400/50 hover:text-white active:scale-[0.98] text-xs font-bold text-red-200 transition-all cursor-pointer font-sans"
+            >
+              ঠিক আছে
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BEAUTIFUL MINIMUM SAVINGS WARNING DIALOG */}
+      {showMinSavingsAlert && (
+        <div 
+          className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs animate-fade-in"
+          onClick={() => setShowMinSavingsAlert(false)}
+        >
+          <div 
+            className="bg-[#121214] border border-[#c5a059]/25 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button icon */}
+            <button 
+              onClick={() => setShowMinSavingsAlert(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-900/50 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Warn triangle Icon Accent */}
+            <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-[#c5a059] mb-4 animate-pulse">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-sm font-bold text-zinc-100 font-sans mb-1.5">
+              ন্যূনতম সঞ্চয় ব্যালেন্স প্রয়োজন!
+            </h3>
+            <p className="text-[11px] text-zinc-400 leading-relaxed font-sans mb-5 px-1">
+              দুঃখিত! ঋণ আবেদনের জন্য আপনার একাউন্টে ন্যূনতম সঞ্চয় ব্যালেন্স থাকতে হবে। অনুগ্রহ করে কমপক্ষে <span className="text-[#dfc187] font-bold">৳ {toBanglaDigits((settings?.minSavingsForLoanAmount ?? 500).toLocaleString('bn-BD'))}</span> সঞ্চয় ব্যালেন্স থাকা নিশ্চিত করুন।
+            </p>
+
+            {/* Live Progress comparison meter */}
+            <div className="bg-[#18181b] rounded-xl p-3 mb-5 border border-zinc-850/65 text-left font-sans">
+              <div className="flex justify-between items-center text-[10px] text-zinc-450 mb-1.5">
+                <span>আপনার সঞ্চয় ব্যালেন্স</span>
+                <span>প্রয়োজনীয় সঞ্চয়</span>
+              </div>
+              <div className="flex justify-between items-end mb-2.5">
+                <span className="text-xs font-bold text-emerald-400 font-mono">
+                  {formatBDT(userSavings)}
+                </span>
+                <span className="text-xs font-bold text-[#dfc187] font-mono">
+                  {formatBDT(minSavingsRequired)}
+                </span>
+              </div>
+              
+              {/* Custom micro progress bar */}
+              <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-850/80">
+                <div 
+                  className="bg-gradient-to-r from-[#c5a059] to-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${Math.min(100, Math.round((userSavings / minSavingsRequired) * 100))}%` 
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowMinSavingsAlert(false)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#c5a059] to-[#dfc187] hover:brightness-110 text-zinc-950 active:scale-[0.98] text-xs font-bold transition-all cursor-pointer font-sans"
             >
               ঠিক আছে
             </button>
