@@ -697,6 +697,17 @@ function runDatabaseMigrations(db: any): boolean {
                   }, { merge: true }).catch(err => {
                     console.error("[Migration] Failed syncing base64 image to firebaseDoc during setup migration:", err);
                   });
+
+                  // Also back up as a separate document
+                  const separateDocRef = doc(firebaseDb, "nano_finance_docs", `loan_${loan.id || "LN9999"}_${field}`);
+                  setDoc(separateDocRef, {
+                    loanId: loan.id || "LN9999",
+                    field,
+                    base64: base64Str,
+                    createdAt: Date.now()
+                  }).catch(err => {
+                    console.error("[Migration] Failed syncing base64 image to separate firebaseDoc during setup migration:", err);
+                  });
                 }
               }
             }
@@ -1730,39 +1741,53 @@ app.get("/api/loan-document/:loanId/:field", async (req, res) => {
     // 2. Local file missing (stateless container restart scenario). Restore from Cloud Firestore!
     if (firebaseDb) {
       console.log(`[Loan-Document] Local file missing for ${loanId} ${field}. Restoring from Cloud Firestore...`);
-      const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
-      const docSnap = await getDoc(docRef);
+      
+      // Try individual document first
+      let docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}_${field}`);
+      let docSnap = await getDoc(docRef);
+      let base64Str = "";
+      
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        const base64Str = data[`${field}Url`] || data[field];
-        if (base64Str && (base64Str.startsWith("data:") || base64Str.length > 100)) {
-          // Decode and write back locally to restore cache
-          const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-          let dataBuffer: Buffer;
-          let extension = "jpg";
-          
-          if (matches && matches.length === 3) {
-            const mimeType = matches[1];
-            const rawBase64 = matches[2];
-            dataBuffer = Buffer.from(rawBase64, 'base64');
-            if (mimeType.includes("pdf")) {
-              extension = "pdf";
-            } else if (mimeType.includes("png")) {
-              extension = "png";
-            } else if (mimeType.includes("webp")) {
-              extension = "webp";
-            }
-          } else {
-            dataBuffer = Buffer.from(base64Str, 'base64');
-          }
-          
-          const filename = `loan_${loanId}_${field}.${extension}`;
-          const filePath = path.join(UPLOADS_DIR, filename);
-          fs.writeFileSync(filePath, dataBuffer);
-          
-          console.log(`[Loan-Document] Cache successfully restored for ${loanId} ${field}.`);
-          return res.sendFile(filePath);
+        const docData = docSnap.data();
+        base64Str = docData.base64 || docData.base64Str || docData[`${field}Url`] || docData[field];
+      } else {
+        // Fallback to legacy combined document
+        console.log(`[Loan-Document] Individual doc missing. Trying legacy combined doc for ${loanId}...`);
+        docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
+        docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          base64Str = docData[`${field}Url`] || docData[field];
         }
+      }
+      
+      if (base64Str && (base64Str.startsWith("data:") || base64Str.length > 100)) {
+        // Decode and write back locally to restore cache
+        const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        let dataBuffer: Buffer;
+        let extension = "jpg";
+        
+        if (matches && matches.length === 3) {
+          const mimeType = matches[1];
+          const rawBase64 = matches[2];
+          dataBuffer = Buffer.from(rawBase64, 'base64');
+          if (mimeType.includes("pdf")) {
+            extension = "pdf";
+          } else if (mimeType.includes("png")) {
+            extension = "png";
+          } else if (mimeType.includes("webp")) {
+            extension = "webp";
+          }
+        } else {
+          dataBuffer = Buffer.from(base64Str, 'base64');
+        }
+        
+        const filename = `loan_${loanId}_${field}.${extension}`;
+        const filePath = path.join(UPLOADS_DIR, filename);
+        fs.writeFileSync(filePath, dataBuffer);
+        
+        console.log(`[Loan-Document] Cache successfully restored for ${loanId} ${field}.`);
+        return res.sendFile(filePath);
       }
     }
   } catch (err) {
@@ -1819,22 +1844,50 @@ app.post("/api/user/loan/apply", async (req, res) => {
   const savedIncomeProof = saveLoanDocumentFile(incomeProofUrl, loanId, "incomeProof");
   const savedAddressProof = saveLoanDocumentFile(addressProofUrl, loanId, "addressProof");
 
-  // Save full high-resolution base64 data to a separate Cloud Firestore document
+  // Save full high-resolution base64 data to separate Cloud Firestore documents to avoid Firestore 1MB document size limit
   if (firebaseDb && !quotaExhausted) {
-    try {
-      const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
-      await setDoc(docRef, {
-        loanId,
-        nidFrontUrl: nidFrontUrl || "",
-        nidBackUrl: nidBackUrl || "",
-        selfieUrl: selfieUrl || "",
-        incomeProofUrl: incomeProofUrl || "",
-        addressProofUrl: addressProofUrl || "",
-        createdAt: Date.now()
-      });
-      console.log(`[Firebase-Sync] Detailed loan images for ${loanId} persisted in collection nano_finance_docs.`);
-    } catch (err) {
-      console.error(`[Firebase-Sync] Failed to backup loan images to Firestore:`, err);
+    const backupDocument = async (field: string, base64Str: string | null | undefined) => {
+      if (!base64Str || !base64Str.startsWith("data:")) return;
+      try {
+        const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}_${field}`);
+        await setDoc(docRef, {
+          loanId,
+          field,
+          base64: base64Str,
+          createdAt: Date.now()
+        });
+        console.log(`[Firebase-Sync] Persisted separate document for ${loanId} ${field} in Cloud Firestore.`);
+      } catch (err) {
+        console.error(`[Firebase-Sync] Failed to backup individual image for ${loanId} ${field} to Firestore:`, err);
+      }
+    };
+
+    // Backup all 5 images separately and concurrently
+    await Promise.all([
+      backupDocument("nidFront", nidFrontUrl),
+      backupDocument("nidBack", nidBackUrl),
+      backupDocument("selfie", selfieUrl),
+      backupDocument("incomeProof", incomeProofUrl),
+      backupDocument("addressProof", addressProofUrl),
+    ]).catch(err => {
+      console.error("[Firebase-Sync] Propagating error in backup parallel tasks:", err);
+    });
+    
+    // Also save legacy aggregate document for retro-compatibility (only if total payload is small)
+    const combinedLength = (nidFrontUrl?.length || 0) + (nidBackUrl?.length || 0) + (selfieUrl?.length || 0);
+    if (combinedLength < 500000) {
+      try {
+        const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
+        await setDoc(docRef, {
+          loanId,
+          nidFrontUrl: nidFrontUrl || "",
+          nidBackUrl: nidBackUrl || "",
+          selfieUrl: selfieUrl || "",
+          incomeProofUrl: incomeProofUrl || "",
+          addressProofUrl: addressProofUrl || "",
+          createdAt: Date.now()
+        });
+      } catch (e) {}
     }
   }
   

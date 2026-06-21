@@ -39,7 +39,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     } else {
       setStep(initialStep);
     }
-  }, [initialStep, user, settings, savingsBalance, requireMinSavings, minSavingsRequired, userSavings]);
+  }, [initialStep]);
 
   const [statusTab, setStatusTab] = useState<'all' | 'active' | 'repaid'>('all');
   const [expandedLoan, setExpandedLoan] = useState<string | null>(null);
