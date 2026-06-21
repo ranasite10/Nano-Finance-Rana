@@ -124,5 +124,5 @@ export interface NewLoanForm {
   incomeProofUrl: string;
   addressProof: File | null;
   addressProofUrl: string;
-  addressProofType: 'electricity' | 'gas' | 'water' | 'internet' | 'rent' | '';
+  addressProofType: 'electricity' | 'gas' | 'tax_receipt' | 'water' | 'internet' | 'rent' | '';
 }

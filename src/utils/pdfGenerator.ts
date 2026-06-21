@@ -558,6 +558,7 @@ export function generateLoanPDF({
     switch (type) {
       case 'electricity': return 'ঠিকানার প্রমাণ (বিদ্যুৎ বিল)';
       case 'gas': return 'ঠিকানার প্রমাণ (গ্যাস বিল)';
+      case 'tax_receipt': return 'ঠিকানার প্রমাণ (ট্যাক্স রশিদ)';
       case 'water': return 'ঠিকানার প্রমাণ (পানির বিল)';
       case 'internet': return 'ঠিকানার প্রমাণ (ইন্টারনেট বিল)';
       case 'rent': return 'ঠিকানার প্রমাণ (ভাড়া চুক্তি)';

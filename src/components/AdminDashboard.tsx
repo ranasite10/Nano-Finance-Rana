@@ -3350,6 +3350,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                               {
                                 loan.addressProofType === 'electricity' ? 'বিদ্যুৎ বিল' :
                                 loan.addressProofType === 'gas' ? 'গ্যাস বিল' :
+                                loan.addressProofType === 'tax_receipt' ? 'ট্যাক্স রশিদ' :
                                 loan.addressProofType === 'water' ? 'পানির বিল' :
                                 loan.addressProofType === 'internet' ? 'ইন্টারনেট বিল' :
                                 loan.addressProofType === 'rent' ? 'ভাড়া চুক্তিপত্র' : 'বিদ্যুৎ বিল'

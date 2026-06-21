@@ -65,7 +65,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     incomeProofUrl: '',
     addressProof: null,
     addressProofUrl: '',
-    addressProofType: 'bank_statement',
+    addressProofType: 'electricity',
   });
 
   // Automatically adjust and synchronize dynamic interest rates proportionally based on selected term months (e.g. 14% rate over 12 months)
@@ -156,7 +156,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
       if (!isImage && !isPdf) {
         setValidationError({
           title: 'অসমর্থিত ফাইল ফরম্যাট',
-          message: 'ব্যাংক স্টেটমেন্ট হিসেবে শুধুমাত্র ইমেজ ফাইল (JPG, JPEG, PNG, WEBP) অথবা PDF ডকুমেন্ট আপলোড করা যাবে।'
+          message: 'ইউটিলিটি বিল অথবা ট্যাক্স রশিদ হিসেবে শুধুমাত্র ইমেজ ফাইল (JPG, JPEG, PNG, WEBP) অথবা PDF ডকুমেন্ট আপলোড করা যাবে।'
         });
         return;
       }
@@ -297,12 +297,12 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     }
 
     if (!form.addressProofType) {
-      alert('অনুগ্রহ করে ঠিকানার প্রমাণের ধরণটি নির্বাচন করুন (যেমন: বিদ্যুৎ বিল, গ্যাস বিল)।');
+      alert('অনুগ্রহ করে ইউটিলিটি বিল অথবা ট্যাক্স রশিদের ধরণ নির্বাচন করুন।');
       return;
     }
 
     if (!form.addressProof) {
-      alert('অনুগ্রহ করে নির্বাচিত ঠিকানার প্রমাণের ফাইল বা ছবি আপলোড করুন।');
+      alert('অনুগ্রহ করে নির্বাচিত ইউটিলিটি বিল (বিদ্যুৎ/গ্যাস) অথবা ট্যাক্স রশিদ আপলোড করুন।');
       return;
     }
 
@@ -380,7 +380,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
       incomeProofUrl: '',
       addressProof: null,
       addressProofUrl: '',
-      addressProofType: 'bank_statement',
+      addressProofType: 'electricity',
     });
   };
 
@@ -798,7 +798,7 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 onDragOver={(e) => handleDragOver(e, 'selfie')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'selfie')}
-                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'selfie' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`col-span-1 relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'selfie' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
                 {uploadingFields.selfie && (
                   <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
@@ -864,12 +864,12 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 )}
               </div>
 
-              {/* Box 4: Bank Statement */}
+              {/* Box 4: Utility Bill/Tax Receipt */}
               <div
                 onDragOver={(e) => handleDragOver(e, 'addressProof')}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, 'addressProof')}
-                className={`relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'addressProof' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
+                className={`col-span-1 relative border-2 border-dashed rounded-2xl p-2.5 flex flex-col items-center justify-center text-center transition-all bg-[#111113] h-36 ${dragOverField === 'addressProof' ? 'border-[#c5a059] bg-[#c5a059]/5' : 'border-zinc-800'}`}
               >
                 {uploadingFields.addressProof && (
                   <div className="absolute inset-0 bg-[#000000a0] flex flex-col items-center justify-center rounded-2xl z-25">
@@ -897,28 +897,36 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
 
                 {form.addressProofUrl ? (
                   <div className="relative group w-full h-full flex flex-col items-center justify-center">
-                    <div className="w-full h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center mb-1">
+                    <div className="w-full h-14 rounded-lg overflow-hidden border border-zinc-900 bg-zinc-950 flex items-center justify-center mb-1">
                       {form.addressProofUrl.startsWith('data:image/') || form.addressProofUrl.startsWith('blob:') || form.addressProofUrl.includes('unsplash.com') || form.addressProofUrl.includes('http') || form.addressProofUrl.startsWith('/') ? (
                         <img
                           src={form.addressProofUrl}
-                          alt="Bank Statement Thumbnail"
+                          alt="Utility Bill/Tax"
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <FileText className="w-6 h-6 text-[#c5a059]" />
+                        <FileText className="w-5 h-5 text-[#c5a059]" />
                       )}
                     </div>
-                    <div className="flex gap-2 z-10 w-full justify-center">
+                    
+                    {/* Document Type Badge */}
+                    <span className="absolute top-1 left-1 bg-black/85 px-1.5 py-0.5 rounded text-[8px] font-sans text-[#dfc187] border border-zinc-800">
+                      {form.addressProofType === 'electricity' ? 'বিদ্যুৎ বিল' : form.addressProofType === 'gas' ? 'গ্যাস বিল' : form.addressProofType === 'tax_receipt' ? 'ট্যাক্স রশিদ' : 'ইউটিলিটি'}
+                    </span>
+
+                    <div className="flex gap-1 z-10 w-full justify-center">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPreviewFileUrl(form.addressProofUrl || '');
-                          setPreviewFileTitle('ব্যাংক স্টেটমেন্ট');
+                          setPreviewFileTitle(
+                            form.addressProofType === 'electricity' ? 'বিদ্যুৎ বিল' : form.addressProofType === 'gas' ? 'গ্যাস বিল' : form.addressProofType === 'tax_receipt' ? 'ট্যাক্স রশিদ' : 'ইউটিলিটি বিল'
+                          );
                         }}
-                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 bg-[#102a1b]/90 px-2 py-1 rounded border border-emerald-950/50 transition-colors cursor-pointer"
+                        className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-0.5 bg-[#102a1b]/90 px-1.5 py-0.5 rounded border border-emerald-950/50 transition-colors cursor-pointer"
                       >
-                        <Eye className="w-3 h-3" /> বড় করুন
+                        <Eye className="w-2.5 h-2.5" /> বড় করুন
                       </button>
                       <button
                         type="button"
@@ -926,17 +934,35 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                           e.stopPropagation();
                           handleUploadClick('addressProof');
                         }}
-                        className="text-[10px] text-zinc-300 hover:text-white font-bold flex items-center gap-1 bg-zinc-90 w-12 px-2 py-1 rounded border border-zinc-800 transition-colors cursor-pointer"
+                        className="text-[9px] text-zinc-300 hover:text-white font-bold flex items-center gap-0.5 bg-zinc-90 w-11 px-1.5 py-0.5 rounded border border-zinc-800 transition-colors cursor-pointer"
                       >
                         পরিবর্তন
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div onClick={() => handleUploadClick('addressProof')} className="flex flex-col items-center cursor-pointer w-full h-full justify-center">
-                    <Upload className="w-5 h-5 text-zinc-400 mb-1.5" />
-                    <span className="text-xs font-bold font-sans text-zinc-200 text-center">ব্যাংক স্টেটমেন্ট দিন</span>
-                    <span className="text-[10px] font-sans text-zinc-455 mt-1 text-center">ক্যামেরা অথবা গ্যালারি</span>
+                  <div className="flex flex-col items-center w-full h-full justify-between py-1">
+                    {/* Compact custom dropdown option */}
+                    <div 
+                      onClick={(e) => e.stopPropagation()} 
+                      className="w-full px-1 z-15"
+                    >
+                      <select
+                        value={form.addressProofType}
+                        onChange={(e) => setForm((prev) => ({ ...prev, addressProofType: e.target.value as any }))}
+                        className="w-full bg-[#161619] border border-zinc-850 hover:border-[#c5a059]/40 text-zinc-300 text-[10px] font-sans font-bold rounded px-1 py-0.5 focus:outline-none cursor-pointer"
+                      >
+                        <option value="electricity">⚡ বিদ্যুৎ বিল</option>
+                        <option value="gas">🔥 গ্যাস বিল</option>
+                        <option value="tax_receipt">📝 ট্যাক্স রশিদ</option>
+                      </select>
+                    </div>
+
+                    <div onClick={() => handleUploadClick('addressProof')} className="flex flex-col items-center cursor-pointer w-full flex-grow justify-center">
+                      <Upload className="w-4 h-4 text-zinc-400 mb-1" />
+                      <span className="text-[11px] font-bold font-sans text-zinc-200 text-center">বিল বা রশিদ দিন</span>
+                      <span className="text-[8px] font-sans text-zinc-455 text-center">ক্যামেরা অথবা গ্যালারি</span>
+                    </div>
                   </div>
                 )}
               </div>
