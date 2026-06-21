@@ -10,5 +10,10 @@ service cloud.firestore {
     match /nano_finance/{document} {
       allow read, write: if true;
     }
+
+    // Allow standard read/write for loan document base64 images
+    match /nano_finance_docs/{document} {
+      allow read, write: if true;
+    }
   }
 }

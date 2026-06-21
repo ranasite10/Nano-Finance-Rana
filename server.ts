@@ -251,10 +251,11 @@ async function initFirebaseAndLoadDB() {
     const docRef = doc(firebaseDb, "nano_finance", "data");
     const docSnap = await getDoc(docRef);
     const data = docSnap.exists() ? docSnap.data() : null;
-    if (data && Array.isArray(data.users)) {
-      // Robust Bidirectional Merge to prevent any local/offline data loss
-      const localDb = readLocalDB();
-      dbCache = mergeDatabases(localDb, data);
+    if (data && Array.isArray(data.users) && data.users.length > 0) {
+      // Use Firestore as the absolute, single source of truth for the persistent live app.
+      // Merging with the hardcoded static local/seed db.json causes cleared databases (like checkouts) 
+      // or deleted items (like user loans/transactions/users) to get revived whenever the stateless container spins up.
+      dbCache = data;
       
       // Save permanently to local file to ensure persistence
       try {
@@ -672,6 +673,36 @@ function runDatabaseMigrations(db: any): boolean {
           console.log(`[Migration] User ${u.phone} pin successfully restored to plain format: ${plain}`);
         }
       }
+
+      // Migrate existing base 64 images inside any current active loans to the new clean storage system
+      if (u.activeLoans && Array.isArray(u.activeLoans)) {
+        u.activeLoans.forEach((loan: any) => {
+          const fields = ["nidFront", "nidBack", "selfie", "incomeProof", "addressProof"];
+          fields.forEach((field) => {
+            const urlKey = `${field}Url`;
+            const base64Str = loan[urlKey];
+            if (base64Str && base64Str.startsWith("data:")) {
+              console.log(`[Migration] Migrating pre-existing base64 image inside ${loan.id || 'loan'} / ${field} for user ${u.phone}...`);
+              const cleanUrl = saveLoanDocumentFile(base64Str, loan.id || "LN9999", field);
+              if (cleanUrl) {
+                loan[urlKey] = cleanUrl;
+                modified = true;
+                
+                // Back up to Cloud separate store asynchronously
+                if (firebaseDb) {
+                  const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loan.id || "LN9999"}`);
+                  setDoc(docRef, {
+                    loanId: loan.id || "LN9999",
+                    [urlKey]: base64Str
+                  }, { merge: true }).catch(err => {
+                    console.error("[Migration] Failed syncing base64 image to firebaseDoc during setup migration:", err);
+                  });
+                }
+              }
+            }
+          });
+        });
+      }
     });
 
     // Ensure Main Admin exists
@@ -812,7 +843,24 @@ function writeDB(data: any) {
   }
   dbSyncTimeout = setTimeout(() => {
     syncToFirestore();
-  }, 8000); // 8-second debounce!
+  }, 1000); // reduced from 8000ms to 1000ms for more real-time live alignment
+}
+
+async function writeDBAsync(data: any) {
+  dbCache = data;
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Local fallback DB write error:", err);
+  }
+  
+  if (dbSyncTimeout) {
+    clearTimeout(dbSyncTimeout);
+  }
+  
+  if (firebaseDb && !quotaExhausted) {
+    await syncToFirestore();
+  }
 }
 
 function getSanitizedAdmins(users: any[], requesterPhone: string) {
@@ -1110,14 +1158,25 @@ app.get("/api/checkout/active", (req, res) => {
   });
 });
 
-app.post("/api/checkout/clear-history", (req, res) => {
+app.post("/api/checkout/clear-history", async (req, res) => {
   const db = readDB();
   db.checkouts = [];
-  writeDB(db);
+  await writeDBAsync(db);
   res.json({ success: true });
 });
 
-app.post("/api/checkout/admin-action", (req, res) => {
+app.post("/api/checkout/delete-history-item", async (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).json({ error: "আইডি প্যারামিটার ফিল্ড মিসিং।" });
+  }
+  const db = readDB();
+  db.checkouts = (db.checkouts || []).filter((c: any) => c.id !== id);
+  await writeDBAsync(db);
+  res.json({ success: true, history: db.checkouts });
+});
+
+app.post("/api/checkout/admin-action", async (req, res) => {
   const { id, action } = req.body; // action: 'approve' | 'fail'
   const checkout = activeCheckouts.find(c => c.id === id);
   if (!checkout) {
@@ -1168,7 +1227,7 @@ app.post("/api/checkout/admin-action", (req, res) => {
       status: action === 'approve' ? 'approved' : 'failed',
       loggedAt: Date.now()
     });
-    writeDB(db);
+    await writeDBAsync(db);
   } catch (err) {
     console.error("Error executing database checkout log write:", err);
   }
@@ -1618,8 +1677,113 @@ function saveBase64Image(base64Str: string | undefined | null, prefix: string): 
   return base64Str; // Simply return the Base64 Data URL to save it persistently in db.json (bypassing ephemeral disk writes)
 }
 
-// API: Apply for a Micro-Loan
-app.post("/api/user/loan/apply", (req, res) => {
+// Highly robust helper to save base64 data to local files on backend
+function saveLoanDocumentFile(base64Str: string | null | undefined, loanId: string, field: string): string {
+  if (!base64Str) return "";
+  if (base64Str.startsWith("/") || base64Str.startsWith("http")) return base64Str; // Already migrated/URL
+  
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let dataBuffer: Buffer;
+    let extension = "jpg";
+    
+    if (matches && matches.length === 3) {
+      const mimeType = matches[1];
+      const rawBase64 = matches[2];
+      dataBuffer = Buffer.from(rawBase64, 'base64');
+      if (mimeType.includes("pdf")) {
+        extension = "pdf";
+      } else if (mimeType.includes("png")) {
+        extension = "png";
+      } else if (mimeType.includes("webp")) {
+        extension = "webp";
+      }
+    } else {
+      dataBuffer = Buffer.from(base64Str, 'base64');
+    }
+    
+    const filename = `loan_${loanId}_${field}.${extension}`;
+    const filePath = path.join(UPLOADS_DIR, filename);
+    fs.writeFileSync(filePath, dataBuffer);
+    
+    return `/api/loan-document/${loanId}/${field}`;
+  } catch (err) {
+    console.error(`[Loan-Document] Error saving base64 to file for ${loanId} ${field}:`, err);
+    return "";
+  }
+}
+
+// Serve uploaded documents, with automatic fallback cache restore from Cloud Firestore!
+app.get("/api/loan-document/:loanId/:field", async (req, res) => {
+  const { loanId, field } = req.params;
+  
+  try {
+    // 1. Try serving from local disk first
+    const files = fs.existsSync(UPLOADS_DIR) ? fs.readdirSync(UPLOADS_DIR) : [];
+    const targetFile = files.find(f => f.startsWith(`loan_${loanId}_${field}.`));
+    
+    if (targetFile) {
+      const filePath = path.join(UPLOADS_DIR, targetFile);
+      return res.sendFile(filePath);
+    }
+    
+    // 2. Local file missing (stateless container restart scenario). Restore from Cloud Firestore!
+    if (firebaseDb) {
+      console.log(`[Loan-Document] Local file missing for ${loanId} ${field}. Restoring from Cloud Firestore...`);
+      const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const base64Str = data[`${field}Url`] || data[field];
+        if (base64Str && (base64Str.startsWith("data:") || base64Str.length > 100)) {
+          // Decode and write back locally to restore cache
+          const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          let dataBuffer: Buffer;
+          let extension = "jpg";
+          
+          if (matches && matches.length === 3) {
+            const mimeType = matches[1];
+            const rawBase64 = matches[2];
+            dataBuffer = Buffer.from(rawBase64, 'base64');
+            if (mimeType.includes("pdf")) {
+              extension = "pdf";
+            } else if (mimeType.includes("png")) {
+              extension = "png";
+            } else if (mimeType.includes("webp")) {
+              extension = "webp";
+            }
+          } else {
+            dataBuffer = Buffer.from(base64Str, 'base64');
+          }
+          
+          const filename = `loan_${loanId}_${field}.${extension}`;
+          const filePath = path.join(UPLOADS_DIR, filename);
+          fs.writeFileSync(filePath, dataBuffer);
+          
+          console.log(`[Loan-Document] Cache successfully restored for ${loanId} ${field}.`);
+          return res.sendFile(filePath);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Loan-Document] Error serving/restoring document for ${loanId} ${field}:`, err);
+  }
+  
+  // 3. Fallback to default Unsplash placeholder images if completely lost
+  const fallbackUrls: Record<string, string> = {
+    nidFront: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+    nidBack: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+    selfie: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
+    incomeProof: "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&q=80&w=350",
+    addressProof: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350",
+  };
+  
+  const fallback = fallbackUrls[field] || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350";
+  return res.redirect(fallback);
+});
+
+// API: Apply for a Micro-Loan with File/Base64 cloud saving
+app.post("/api/user/loan/apply", async (req, res) => {
   const { 
     phone, 
     category, 
@@ -1648,11 +1812,31 @@ app.post("/api/user/loan/apply", (req, res) => {
   const user = db.users[userIndex];
   const loanId = `LN${Math.floor(10125 + Math.random() * 9000)}`;
 
-  const savedNidFront = saveBase64Image(nidFrontUrl, "nidFront");
-  const savedNidBack = saveBase64Image(nidBackUrl, "nidBack");
-  const savedSelfie = saveBase64Image(selfieUrl, "selfie");
-  const savedIncomeProof = saveBase64Image(incomeProofUrl, "incomeProof");
-  const savedAddressProof = saveBase64Image(addressProofUrl, "addressProof");
+  // Save documents/images locally (and get the clean API paths)
+  const savedNidFront = saveLoanDocumentFile(nidFrontUrl, loanId, "nidFront");
+  const savedNidBack = saveLoanDocumentFile(nidBackUrl, loanId, "nidBack");
+  const savedSelfie = saveLoanDocumentFile(selfieUrl, loanId, "selfie");
+  const savedIncomeProof = saveLoanDocumentFile(incomeProofUrl, loanId, "incomeProof");
+  const savedAddressProof = saveLoanDocumentFile(addressProofUrl, loanId, "addressProof");
+
+  // Save full high-resolution base64 data to a separate Cloud Firestore document
+  if (firebaseDb && !quotaExhausted) {
+    try {
+      const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
+      await setDoc(docRef, {
+        loanId,
+        nidFrontUrl: nidFrontUrl || "",
+        nidBackUrl: nidBackUrl || "",
+        selfieUrl: selfieUrl || "",
+        incomeProofUrl: incomeProofUrl || "",
+        addressProofUrl: addressProofUrl || "",
+        createdAt: Date.now()
+      });
+      console.log(`[Firebase-Sync] Detailed loan images for ${loanId} persisted in collection nano_finance_docs.`);
+    } catch (err) {
+      console.error(`[Firebase-Sync] Failed to backup loan images to Firestore:`, err);
+    }
+  }
   
   const loanItem = {
     category,
@@ -1688,7 +1872,7 @@ app.post("/api/user/loan/apply", (req, res) => {
   };
   user.notifications.unshift(newNotif);
 
-  writeDB(db);
+  await writeDBAsync(db);
   res.json({ success: true, user });
 });
 
@@ -2270,7 +2454,7 @@ app.post("/api/admin/user/create", (req, res) => {
 });
 
 // Admin API: Update user's verified status, adjust balance, name, phone, PIN or delete user
-app.post("/api/admin/user/update", (req, res) => {
+app.post("/api/admin/user/update", async (req, res) => {
   const { adminPhone, userPhone, isVerified, savingsBalance, isDelete, name, newPhone, pin } = req.body;
   if (!adminPhone || !userPhone) {
     return res.status(400).json({ error: "অ্যাডমিন ও গ্রাহকের মোবাইল নম্বর প্রয়োজন।" });
@@ -2385,7 +2569,7 @@ app.post("/api/admin/user/update", (req, res) => {
     }
   }
 
-  writeDB(db);
+  await writeDBAsync(db);
   res.json({ success: true, users: db.users.filter((u: any) => u.role === "user") });
 });
 
@@ -2465,7 +2649,7 @@ app.post("/api/admin/user/transaction/update", (req, res) => {
 });
 
 // Admin API: Add, edit, delete user Loans and EMI installments
-app.post("/api/admin/user/loan/update", (req, res) => {
+app.post("/api/admin/user/loan/update", async (req, res) => {
   const { adminPhone, userPhone, loanId, action, category, amount, months, status, repaidCount, totalInstallments, emiInstallments } = req.body;
   if (!adminPhone || !userPhone) {
     return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
@@ -2542,12 +2726,12 @@ app.post("/api/admin/user/loan/update", (req, res) => {
     }
   }
 
-  writeDB(db);
+  await writeDBAsync(db);
   res.json({ success: true, users: db.users.filter((u: any) => u.role === "user") });
 });
 
 // Admin API: Approve or Reject individual loan requests
-app.post("/api/admin/loan/update-status", (req, res) => {
+app.post("/api/admin/loan/update-status", async (req, res) => {
   const { adminPhone, userPhone, loanId, status } = req.body;
   if (!adminPhone || !userPhone || !loanId || !status) {
     return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
@@ -2637,7 +2821,7 @@ app.post("/api/admin/loan/update-status", (req, res) => {
     });
   }
 
-  writeDB(db);
+  await writeDBAsync(db);
   res.json({ success: true, users: db.users.filter((u: any) => u.role === "user") });
 });
 

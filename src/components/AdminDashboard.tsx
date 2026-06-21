@@ -751,7 +751,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           })
           .catch(err => console.debug("Silent auto-update failed:", err));
         }
-      }, 5000);
+      }, 1500);
 
       return () => clearInterval(intervalId);
     }
@@ -821,6 +821,34 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
             alert('পেমেন্ট ইতিহাস সম্পূর্ণ মুছে ফেলা হয়েছে!');
           } else {
             alert(data.error || 'ইতিহাস মুছতে ব্যর্থ হয়েছে।');
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
+  };
+
+  const handleDeleteCheckoutItem = async (id: string | undefined) => {
+    if (!id) return;
+    askConfirmation(
+      'রেকর্ড মুছুন',
+      'আপনি কি এই পেমেন্ট রেকর্ডটি মুছে ফেলতে চান?',
+      async () => {
+        try {
+          const response = await fetch('/api/checkout/delete-history-item', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ id })
+          });
+          const data = await safeJsonParse(response);
+          if (response.ok && data.success) {
+            setCheckoutHistory(prev => prev.filter(c => c.id !== id));
+            alert('রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে!');
+          } else {
+            alert(data.error || 'রেকর্ডটি মুছতে ব্যর্থ হয়েছে।');
           }
         } catch (err) {
           console.error(err);
@@ -1655,13 +1683,24 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   />
                                 </div>
 
-                                <span className={`text-[10px] px-2.5 py-0.5 rounded font-sans font-bold ${
-                                  isApproved 
-                                    ? 'text-emerald-400 bg-emerald-950/35 border border-emerald-900/30' 
-                                    : 'text-rose-400 bg-rose-950/20 border border-rose-900/30'
-                                }`}>
-                                  {isApproved ? 'সফল পেমেন্ট' : 'বাতিল / ব্যর্থ চেষ্টা'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[10px] px-2.5 py-0.5 rounded font-sans font-bold ${
+                                    isApproved 
+                                      ? 'text-emerald-400 bg-emerald-950/35 border border-emerald-900/30' 
+                                      : 'text-rose-400 bg-rose-950/20 border border-rose-900/30'
+                                  }`}>
+                                    {isApproved ? 'সফল পেমেন্ট' : 'বাতিল / ব্যর্থ চেষ্টা'}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCheckoutItem(session.id || displayId)}
+                                    className="p-1 rounded bg-[#18181b] text-zinc-500 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/30 transition-all cursor-pointer flex items-center justify-center"
+                                    title="রেকর্ডটি মুছুন"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Data displays */}
