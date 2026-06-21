@@ -45,6 +45,39 @@ let dbSyncTimeout: NodeJS.Timeout | null = null;
 let quotaExhausted = false;
 let quotaExhaustedUntil = 0;
 
+const QUOTA_STATUS_PATH = path.join(process.cwd(), "quota_status.json");
+
+function loadQuotaStatus() {
+  try {
+    if (fs.existsSync(QUOTA_STATUS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(QUOTA_STATUS_PATH, "utf-8"));
+      if (data && typeof data.quotaExhaustedUntil === "number") {
+        quotaExhaustedUntil = data.quotaExhaustedUntil;
+        quotaExhausted = Date.now() < quotaExhaustedUntil;
+        if (quotaExhausted) {
+          console.log(`[Firebase-Sync] Persisted quota status loaded: Cloud Firestore is on cooldown mode until ${new Date(quotaExhaustedUntil).toISOString()}`);
+        }
+      }
+    }
+  } catch (err) {
+    // Ignore error
+  }
+}
+
+function saveQuotaStatus(exhausted: boolean) {
+  try {
+    quotaExhausted = exhausted;
+    if (exhausted) {
+      quotaExhaustedUntil = Date.now() + 12 * 60 * 60 * 1000; // 12 hours cooldown to reset the daily quota securely without retrying
+    } else {
+      quotaExhaustedUntil = 0;
+    }
+    fs.writeFileSync(QUOTA_STATUS_PATH, JSON.stringify({ quotaExhaustedUntil }, null, 2), "utf-8");
+  } catch (err) {
+    // Ignore error
+  }
+}
+
 // Active user tracking map (clientId -> { phone, role, lastActive })
 const ACTIVE_SESSIONS = new Map<string, { phone: string | null; role: string; lastActive: number }>();
 
@@ -236,6 +269,15 @@ function mergeDatabases(localDb: any, remoteDb: any) {
 }
 
 async function initFirebaseAndLoadDB() {
+  loadQuotaStatus();
+  if (quotaExhausted && Date.now() < quotaExhaustedUntil) {
+    console.log("[Firebase-Sync] Firestore usage quota is currently exhausted (cooldown active). Operating purely in Local Safe-Memory Backup Mode.");
+    dbCache = readLocalDB();
+    lastSyncStatus = "failed";
+    lastSyncError = "QUOTA_EXHAUSTED: Cloud database usage limit reached. Local-only high-performance backup is active.";
+    return;
+  }
+
   try {
     const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (!fs.existsSync(firebaseConfigPath)) {
@@ -268,7 +310,7 @@ async function initFirebaseAndLoadDB() {
       lastSyncStatus = "success";
       lastSyncTime = Date.now();
       lastSyncError = null;
-      quotaExhausted = false;
+      saveQuotaStatus(false);
       console.log("[Firebase-Sync] Database cache successfully synchronized and merged from Cloud Firestore!");
       
       // Detect if we merged new local data so we schedule writing back to Firestore when quota allows
@@ -297,7 +339,7 @@ async function initFirebaseAndLoadDB() {
       lastSyncStatus = "success";
       lastSyncTime = Date.now();
       lastSyncError = null;
-      quotaExhausted = false;
+      saveQuotaStatus(false);
       console.log("[Firebase-Sync] Initial seed successful in cloud Firestore.");
     }
   } catch (error: any) {
@@ -306,8 +348,7 @@ async function initFirebaseAndLoadDB() {
     
     lastSyncStatus = "failed";
     if (isQuota) {
-      quotaExhausted = true;
-      quotaExhaustedUntil = Date.now() + 30 * 60 * 1000; // 30 mins cooldown
+      saveQuotaStatus(true);
       lastSyncError = "QUOTA_EXHAUSTED: Cloud database usage limit reached. Local-only high-performance backup is active.";
       console.log("[Firebase-Sync] Firestore usage quota limit has been reached. System is running in Local Safe-Memory Backup Mode.");
       if (firebaseDb) {
@@ -348,7 +389,7 @@ async function syncToFirestore() {
     lastSyncStatus = "success";
     lastSyncTime = Date.now();
     lastSyncError = null;
-    quotaExhausted = false;
+    saveQuotaStatus(false);
     console.log("[Firebase-Sync] Changes successfully persistent in Cloud Firestore.");
   } catch (error: any) {
     const errorMsg = error?.message || String(error);
@@ -356,8 +397,7 @@ async function syncToFirestore() {
     
     lastSyncStatus = "failed";
     if (isQuota) {
-      quotaExhausted = true;
-      quotaExhaustedUntil = Date.now() + 30 * 60 * 1000; // 30 mins cooldown
+      saveQuotaStatus(true);
       lastSyncError = "QUOTA_EXHAUSTED: Cloud database usage limit reached. Local-only high-performance backup is active.";
       console.log("[Firebase-Sync] Cloud sync skipped: Firestore usage quota limits exceeded. Successfully fallbacked to Local Safe-Memory backup.");
       if (firebaseDb) {

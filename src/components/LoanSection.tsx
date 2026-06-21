@@ -77,6 +77,28 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     }));
   }, [form.months, annualInterestRate]);
 
+  // Pre-fill loan files from the most recent previous application if available
+  useEffect(() => {
+    const lastLoan = activeLoans && activeLoans.length > 0 ? activeLoans[0] : null;
+    if (lastLoan && !form.nidFrontUrl && !form.nidBackUrl) {
+      const dummyFile = new File([''], 'restored_document.png', { type: 'image/png' });
+      setForm((prev) => ({
+        ...prev,
+        nidFront: prev.nidFront || dummyFile,
+        nidFrontUrl: prev.nidFrontUrl || lastLoan.nidFrontUrl || '',
+        nidBack: prev.nidBack || dummyFile,
+        nidBackUrl: prev.nidBackUrl || lastLoan.nidBackUrl || '',
+        selfie: prev.selfie || dummyFile,
+        selfieUrl: prev.selfieUrl || lastLoan.selfieUrl || '',
+        incomeProof: prev.incomeProof || dummyFile,
+        incomeProofUrl: prev.incomeProofUrl || lastLoan.incomeProofUrl || '',
+        addressProof: prev.addressProof || dummyFile,
+        addressProofUrl: prev.addressProofUrl || lastLoan.addressProofUrl || '',
+        addressProofType: prev.addressProofType || lastLoan.addressProofType || 'electricity',
+      }));
+    }
+  }, [activeLoans]);
+
   const handleAutoFillDemoFiles = () => {
     const dummyFile = new File([''], 'demo_document.png', { type: 'image/png' });
     setForm((prev) => ({
@@ -388,6 +410,45 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
     if (requireMinSavings && userSavings < minSavingsRequired) {
       setShowMinSavingsAlert(true);
     } else {
+      const lastLoan = activeLoans && activeLoans.length > 0 ? activeLoans[0] : null;
+      if (lastLoan) {
+        const dummyFile = new File([''], 'restored_document.png', { type: 'image/png' });
+        setForm({
+          category: '',
+          amount: 50000,
+          months: 12,
+          interestRate: annualInterestRate,
+          nidFront: dummyFile,
+          nidFrontUrl: lastLoan.nidFrontUrl || '',
+          nidBack: dummyFile,
+          nidBackUrl: lastLoan.nidBackUrl || '',
+          selfie: dummyFile,
+          selfieUrl: lastLoan.selfieUrl || '',
+          incomeProof: dummyFile,
+          incomeProofUrl: lastLoan.incomeProofUrl || '',
+          addressProof: dummyFile,
+          addressProofUrl: lastLoan.addressProofUrl || '',
+          addressProofType: lastLoan.addressProofType || 'electricity',
+        });
+      } else {
+        setForm({
+          category: '',
+          amount: 50000,
+          months: 12,
+          interestRate: annualInterestRate,
+          nidFront: null,
+          nidFrontUrl: '',
+          nidBack: null,
+          nidBackUrl: '',
+          selfie: null,
+          selfieUrl: '',
+          incomeProof: null,
+          incomeProofUrl: '',
+          addressProof: null,
+          addressProofUrl: '',
+          addressProofType: 'electricity',
+        });
+      }
       setStep(1);
     }
   };
@@ -1017,18 +1078,20 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                 const getStatusStyle = (st: string) => {
                   switch (st) {
                     case 'pending': return 'bg-amber-950/20 text-amber-400 border-amber-900/30';
-                    case 'approved': return 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30';
-                    case 'paid': return 'bg-zinc-850 text-zinc-300 border-zinc-800';
-                    default: return 'bg-zinc-90 w-12 text-zinc-500 border-zinc-850';
+                    case 'approved': return 'bg-emerald-950/20 text-emerald-400 border-[#c5a059]/30';
+                    case 'paid': return 'bg-zinc-850 text-zinc-300 border-zinc-850';
+                    case 'rejected': return 'bg-rose-950/20 text-rose-400 border-rose-900/25';
+                    default: return 'bg-zinc-900 text-zinc-500 border-zinc-850';
                   }
                 };
 
                 const getStatusText = (st: string) => {
                   switch (st) {
-                    case 'pending': return 'Pending';
-                    case 'approved': return 'Approved';
-                    case 'paid': return 'Paid';
-                    default: return 'Closed';
+                    case 'pending': return 'পেন্ডিং (Pending)';
+                    case 'approved': return 'চলমান (Approved)';
+                    case 'paid': return 'পরিশোধিত (Paid)';
+                    case 'rejected': return 'বাতিল (Rejected)';
+                    default: return st;
                   }
                 };
 
@@ -1107,8 +1170,17 @@ export default function LoanSection({ onBack, activeLoans, onSubmitLoan, initial
                         {loan.status === 'pending' && (
                           <div className="flex gap-2 bg-amber-950/10 p-2.5 rounded-xl border border-amber-900/20 mt-1">
                             <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-zinc-300 leading-relaxed">
+                            <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                               Under evaluation (যাচাই প্রক্রিয়াদ্বীন). Our verification team will review documents in 24 hours.
+                            </p>
+                          </div>
+                        )}
+
+                        {loan.status === 'rejected' && (
+                          <div className="flex gap-2 bg-rose-950/10 p-2.5 rounded-xl border border-rose-900/20 mt-1 animate-fade-in">
+                            <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+                              দুঃখিত! আপনার এই ঋণের আবেদনটি বাতিল হয়েছে। নতুনভাবে আবেদন করতে চাইলে উপরে ডানদিকের <span className="text-[#dfc187] font-bold">"নতুন আবেদন"</span> বাটনে ক্লিক করে পুনরায় আবেদন করুন।
                             </p>
                           </div>
                         )}
