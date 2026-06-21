@@ -94,6 +94,26 @@
           "type": "string"
         }
       }
+    },
+    "LoanDocumentBackup": {
+      "title": "Loan Document Backup",
+      "description": "Backup of a specific document or image file in the loan process.",
+      "type": "object",
+      "properties": {
+        "loanId": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "base64": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        }
+      },
+      "required": ["loanId", "field"]
     }
   },
   "firestore": {
@@ -104,6 +124,10 @@
     "/nano_finance/data": {
       "schema": "object",
       "description": "Complete snapshot of users database stored dynamically for full sync"
+    },
+    "/nano_finance_docs/{documentId}": {
+      "schema": "LoanDocumentBackup",
+      "description": "Individual high-fidelity backups of loan applicant documentation and images"
     }
   }
 }
